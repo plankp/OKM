@@ -28,7 +28,6 @@ public enum Operation {
     CONV_INT_SHORT,
     CONV_INT_LONG,
 
-    INT_POS,
     INT_NEG,
     INT_CPL,
 
@@ -38,7 +37,6 @@ public enum Operation {
     INT_DIV,
     INT_MOD,
 
-    LONG_POS,
     LONG_NEG,
     LONG_CPL,
 

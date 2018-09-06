@@ -773,7 +773,7 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
             value = applyRegisterTransfer(value, baseSeq);
 
             switch (opcode) {
-                case UNARY_ADD:   opcode = useLong ? Operation.LONG_POS : Operation.INT_POS; break;
+                case UNARY_ADD:   opcode = Operation.STORE_VAR; break;
                 case UNARY_SUB:   opcode = useLong ? Operation.LONG_NEG : Operation.INT_NEG; break;
                 case UNARY_TILDA: opcode = useLong ? Operation.LONG_CPL : Operation.INT_CPL; break;
             }

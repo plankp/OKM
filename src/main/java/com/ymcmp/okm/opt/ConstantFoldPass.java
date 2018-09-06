@@ -104,7 +104,6 @@ public final class ConstantFoldPass implements Pass {
                     final long a = Long.parseLong(lhs.value);
                     final long result;
                     switch (stmt.op) {
-                        case INT_POS: case LONG_POS: result = +a; break;
                         case INT_NEG: case LONG_NEG: result = -a; break;
                         case INT_CPL: case LONG_CPL: result = ~a; break;
                         default:
