@@ -1,0 +1,71 @@
+# Each file is a module. They are not loaded and therefore not processed
+# unless referenced by another module. In this demonstration, this module is
+# called `spec`
+
+# Seems harmful, and it most likely will be unless there is another file named
+# spec.okm in the OKM_LOADPATH environment variable. This will halt the
+# compilation if this was this file is the only spec.okm found.
+import spec
+
+# This imports everything from std/io.okm under the namespace with private
+# visibility. All modules are only loaded once.
+import std.io
+
+# This only imports sin(x), cos(x) and tan(x) and atan2(y, x) from std/math.okm
+import std.math(:sin(x), :cos(x), :tan(x), :atan2(y, x))
+
+# This looks stupid since nothing is specified in the parenthesis. It will not
+# cause the compilation to fail as long as the file std/algorithm.okm can be
+# accessed. Not symbols from std.algorithm will be imported; the compiler is
+# allowed to skip the import sequence.
+import std.algorithm()
+
+# Searching for imports go in this order: the current folder is searched
+# first. If the module is not found, it iterates through the OKM_LOADPATH
+# environment variable.
+
+# This is the equivalent of loading from "../testA.okm"
+import .testA
+
+# This is the equivalent of loading from "../../testB.okm"
+import ..testB
+
+# If the directory unshifts too much (meaning from a directory "/a/b" you
+# tried importing "...j"), it counts as the specified module cannot be
+# accessed from the specified directory.
+
+# Access modifiers for modules can be either public, protected, internal or
+# private. If no modifiers are specified, private visibility is applied.
+
+# Public means every module that imports it can see it.
+# Protected means the current directory and its subdirectories can see it.
+# Internal means only the current directory can see it.
+# Private means only the current module can see it.
+
+# Access visibility always go first unless omitted. The following declares
+# a function named plus1(to) as private.
+private int plus1 (to :int) {
+    return to + 1
+}
+
+# The following declares a function called plus1(a, b) as public that reuses
+# the previously defined plus1(to) function.
+public int plus1 (a, b :int) {
+    # Since return is used on a function, tail-call optimization has to
+    # happen.
+    return plus1 (to: a + b)
+}
+
+# The following function called add(a, b) is protected
+protected double add (a :int b :double) {
+    return a + b
+}
+
+# The following declares a function that takes no parameters and returns unit
+# named foo as private.
+unit foo {
+    # return is omitted since implicit returns always return unit. Imagine a
+    # case where it tail calling another unit returning function. In order for
+    # tail calls to be guaranteed, you would write return bar() if bar was a
+    # function that takes no parameters and returns unit.
+}

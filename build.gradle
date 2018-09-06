@@ -1,0 +1,20 @@
+apply plugin: 'java'
+apply plugin: 'antlr'
+apply plugin: 'application'
+
+mainClassName = 'com.ymcmp.okm.App'
+
+sourceCompatibility = '1.8'
+targetCompatibility = '1.8'
+
+repositories {
+    jcenter()
+}
+
+dependencies {
+    antlr 'org.antlr:antlr4:4.7.1'
+}
+
+generateGrammarSource {
+    arguments += ['-visitor', '-no-listener', '-package', 'com.ymcmp.okm.grammar']
+}

@@ -1,0 +1,51 @@
+import std.math(PI, :atan2(y, x), :sin(rad))
+
+import rel.vis
+
+# This function (since it has the same name as the module)
+# is used to initialize the module. Runtime automatically
+# call it (think of the static block in java). Since it is
+# a function, the user is allowed to call it themselves.
+unit demo() {
+    a, b :double;
+
+    # a must equal b (they call the same function)
+    a = atan2(y: 20, x: 50);
+    b = :atan2(y, x)(20, 50);
+
+    # C equals yields 0
+    c := sin(rad: PI);
+
+    yield10();
+
+    return demo2();
+}
+
+unit demo2() {
+    # a :int;
+    # a = 1 + 2 (20);
+    return
+}
+
+int yield10() {
+    return 2 * 5 + 2 * 0
+}
+
+unit demo() {
+    d :long
+    a := 1 + -2
+    b := true
+    c := a + 2
+    d = c
+
+    j := 0.1 + 0.2
+
+    # We manually return everything for now
+    return
+}
+
+a, b :int
+
+unit add_extern() {
+    c := a + b
+}

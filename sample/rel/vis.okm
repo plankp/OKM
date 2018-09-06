@@ -1,0 +1,14 @@
+import test_bcd
+public import foo.test_cd
+
+private unit a() {
+}
+
+internal unit b() {
+}
+
+protected unit c() {
+}
+
+public unit d() {
+}

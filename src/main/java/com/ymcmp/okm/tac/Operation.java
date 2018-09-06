@@ -1,0 +1,42 @@
+package com.ymcmp.okm.tac;
+
+public enum Operation {
+    NOP,
+
+    UNARY_ADD,
+    UNARY_SUB,
+    UNARY_NOT,
+    UNARY_TILDA,
+
+    BINARY_ADD,
+    BINARY_SUB,
+    BINARY_MUL,
+    BINARY_DIV,
+    BINARY_MOD,
+    BINARY_LESSER_THAN,
+    BINARY_GREATER_THAN,
+    BINARY_LESSER_EQUALS,
+    BINARY_GREATER_EQUALS,
+    BINARY_EQUALS,
+    BINARY_NOT_EQUALS,
+
+    LOAD_TRUE,
+    LOAD_FALSE,
+    LOAD_NUMERAL,
+
+    STORE_VAR,
+
+    RETURN_UNIT,
+    RETURN_VALUE,
+
+    GOTO,
+
+    JUMP_IF_TRUE,
+    JUMP_IF_FALSE,
+
+    POP_PARAM,
+
+    PUSH_PARAM,
+
+    CALL;
+}
