@@ -20,6 +20,34 @@ public enum Operation {
     BINARY_EQUALS,
     BINARY_NOT_EQUALS,
 
+    CONV_BYTE_INT,
+    CONV_SHORT_INT,
+    CONV_LONG_INT,
+
+    CONV_INT_BYTE,
+    CONV_INT_SHORT,
+    CONV_INT_LONG,
+
+    INT_POS,
+    INT_NEG,
+    INT_CPL,
+
+    INT_ADD,
+    INT_SUB,
+    INT_MUL,
+    INT_DIV,
+    INT_MOD,
+
+    LONG_POS,
+    LONG_NEG,
+    LONG_CPL,
+
+    LONG_ADD,
+    LONG_SUB,
+    LONG_MUL,
+    LONG_DIV,
+    LONG_MOD,
+
     LOAD_TRUE,
     LOAD_FALSE,
     LOAD_NUMERAL,

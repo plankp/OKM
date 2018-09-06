@@ -161,6 +161,11 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
 
             // This scope already contains the local parameters
             currentScope = funcInfo.getA();
+            final String mangledName = currentScope.getProcessedName(NAMING_STRAT, currentScope.functionName);
+
+            if (RESULT.containsKey(mangledName)) {
+                throw new DuplicateSymbolException(currentScope.functionName);
+            }
 
             // Define the return type of the function
             conformingType = visitType(fctx.ret);
@@ -181,7 +186,6 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
 
             // Optimization
             final EliminateNopPass eliminateNop = new EliminateNopPass();
-            final String mangledName = currentScope.getProcessedName(NAMING_STRAT, currentScope.functionName);
             for (final Pass pass : OPT_PASSES) {
                 pass.process(mangledName, funcStmts);
                 eliminateNop.process(mangledName, funcStmts);
@@ -635,6 +639,40 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
         return dispatchBinaryOperator(lhs, ctx.op.getText(), rhs);
     }
 
+    private static final UnaryType TYPE_BYTE = UnaryType.getType("byte");
+    private static final UnaryType TYPE_SHORT = UnaryType.getType("short");
+    private static final UnaryType TYPE_INT = UnaryType.getType("int");
+    private static final UnaryType TYPE_LONG = UnaryType.getType("long");
+
+    private static Operation[] convertSeqToLong(final Type t) {
+        if (TYPE_BYTE.isSameType(t)) {
+            return new Operation[] { Operation.CONV_BYTE_INT, Operation.CONV_INT_LONG };
+        }
+        if (TYPE_SHORT.isSameType(t)) {
+            return new Operation[] { Operation.CONV_SHORT_INT, Operation.CONV_INT_LONG };
+        }
+        if (TYPE_INT.isSameType(t)) {
+            return new Operation[] { Operation.CONV_INT_LONG };
+        }
+        if (TYPE_LONG.isSameType(t)) {
+            return new Operation[] { Operation.NOP };
+        }
+        return null;
+    }
+
+    private Operation[] makeUncastSequence(final boolean useLong, final Type t) {
+        if (TYPE_BYTE.isSameType(t)) {
+            return new Operation[] { useLong ? Operation.CONV_LONG_INT : Operation.NOP, Operation.CONV_INT_BYTE };
+        }
+        if (TYPE_SHORT.isSameType(t)) {
+            return new Operation[] { useLong ? Operation.CONV_LONG_INT : Operation.NOP, Operation.CONV_INT_SHORT };
+        }
+        if (TYPE_INT.isSameType(t)) {
+            return new Operation[] { useLong ? Operation.CONV_LONG_INT : Operation.NOP };
+        }
+        return new Operation[0];
+    }
+
     private Type dispatchBinaryOperator(Type lhs, String name, Type rhs) {
         final Tuple<Operation, BinaryOperator> tuple = BIN_OP_MAPPING.get(name);
         final BinaryOperator op = tuple.getB();
@@ -648,13 +686,57 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
         }
 
         final Value temporary = Register.makeTemporary();
-        final Value a = VALUE_STACK.pop();
-        final Value b = VALUE_STACK.pop();
-        funcStmts.add(new Statement(tuple.getA(), b, a, temporary));
-        VALUE_STACK.push(temporary);
+        Value a = VALUE_STACK.pop();  // value of rhs
+        Value b = VALUE_STACK.pop();  // value of lhs
+        Operation opcode = tuple.getA();
+
+        Operation[] cleanupSeq = new Operation[0];
+
+        final Operation[] aSeq = convertSeqToLong(rhs);
+        final Operation[] bSeq = convertSeqToLong(lhs);
+
+        if (aSeq != null && bSeq != null) {
+            boolean useLong = true;
+
+            // Insert the conversion sequences
+            if (aSeq[aSeq.length - 1] == Operation.CONV_INT_LONG
+                    && bSeq[bSeq.length - 1] == Operation.CONV_INT_LONG) {
+                // convert to int is enough
+                aSeq[aSeq.length - 1] = bSeq[bSeq.length - 1] = Operation.NOP;
+                useLong = false;
+            }
+
+            a = applyRegisterTransfer(a, aSeq);
+            b = applyRegisterTransfer(b, bSeq);
+
+            switch (opcode) {
+                case BINARY_ADD: opcode = useLong ? Operation.LONG_ADD : Operation.INT_ADD; break;
+                case BINARY_SUB: opcode = useLong ? Operation.LONG_SUB : Operation.INT_SUB; break;
+                case BINARY_MUL: opcode = useLong ? Operation.LONG_MUL : Operation.INT_MUL; break;
+                case BINARY_DIV: opcode = useLong ? Operation.LONG_DIV : Operation.INT_DIV; break;
+                case BINARY_MOD: opcode = useLong ? Operation.LONG_MOD : Operation.INT_MOD; break;
+            }
+
+            // Downcast back to actual type is necessary
+            cleanupSeq = makeUncastSequence(useLong, result);
+        }
+
+        funcStmts.add(new Statement(opcode, b, a, temporary));
+        VALUE_STACK.push(applyRegisterTransfer(temporary, cleanupSeq));
 
         LOGGER.info(lhs + " " + name + " " + rhs + " yields " + result);
         return result;
+    }
+
+    private Value applyRegisterTransfer(Value source, Operation... steps) {
+        for (final Operation step : steps) {
+            if (step != Operation.NOP) {
+                final Value dest = Register.makeTemporary();
+                funcStmts.add(new Statement(step, source, dest));
+                source = dest;  // perform transfer
+            }
+        }
+        return source;
     }
 
     @Override
@@ -673,8 +755,35 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
         }
 
         final Value temporary = Register.makeTemporary();
-        funcStmts.add(new Statement(tuple.getA(), VALUE_STACK.pop(), temporary));
-        VALUE_STACK.push(temporary);
+        Value value = VALUE_STACK.pop();
+        Operation opcode = tuple.getA();
+
+        Operation[] cleanupSeq = new Operation[0];
+
+        final Operation[] baseSeq = convertSeqToLong(base);
+
+        if (base != null) {
+            boolean useLong = true;
+            if (baseSeq[baseSeq.length - 1] == Operation.CONV_INT_LONG) {
+                // Convert to int is enough
+                baseSeq[baseSeq.length - 1] = Operation.NOP;
+                useLong = false;
+            }
+
+            value = applyRegisterTransfer(value, baseSeq);
+
+            switch (opcode) {
+                case UNARY_ADD:   opcode = useLong ? Operation.LONG_POS : Operation.INT_POS; break;
+                case UNARY_SUB:   opcode = useLong ? Operation.LONG_NEG : Operation.INT_NEG; break;
+                case UNARY_TILDA: opcode = useLong ? Operation.LONG_CPL : Operation.INT_CPL; break;
+            }
+
+            // Downcast back to actual type is necessary
+            cleanupSeq = makeUncastSequence(useLong, result);
+        }
+
+        funcStmts.add(new Statement(opcode, value, temporary));
+        VALUE_STACK.push(applyRegisterTransfer(temporary, cleanupSeq));
 
         LOGGER.info(name + " " + base + " yields " + result);
         return result;

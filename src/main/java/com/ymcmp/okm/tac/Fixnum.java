@@ -38,6 +38,16 @@ public final class Fixnum implements Serializable, Value {
         this.isInt = true;
     }
 
+    public Fixnum(long value) {
+        this.value = Long.toString(value);
+        this.size = Long.SIZE;
+        this.isInt = true;
+    }
+
+    public Fixnum changeSize(int size) {
+        return new Fixnum(this.value, size);
+    }
+
     @Override
     public boolean isNumeric() {
         return true;
