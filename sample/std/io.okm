@@ -1,0 +1,7 @@
+public unit print (i :int) {
+    # Runtime fill in
+}
+
+public unit println (i :int) {
+    # Runtime fill in
+}

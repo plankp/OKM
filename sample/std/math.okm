@@ -3,63 +3,53 @@ public PI, E :double
 unit math() {
     PI = 3.1415926536
     E = 2.7182818285
+    return
 }
 
-float power(base :float, exp :int) {
-    if exp < 0 {
-        if base == 0
-            return -0; # Error!!
-        return 1 / (base * power(base: base, exp: -exp - 1));
-    }
-    if exp == 0 return 1
-    if exp == 1 return base;
-    return base * power(base: base, exp: exp - 1);
+public float power(base :float, exp :int) {
+    # Runtime will fill this in
 }
 
-int fact (n :int) = fact_aux(n: n, acc: 1)
-
-int fact_aux (n, acc :int) =
-    if n < 2
-        acc
-    else
-        fact_aux(n: n - 1, acc: n * acc)
+public double random() {
+    # Runtime will fill this in
+}
 
 public double sin (rad :double) {
-    # Compiler end will fill this in
+    # Runtime will fill this in
 }
 
 public double cos (rad :double) {
-    # Compiler end will fill this in
+    # Runtime will fill this in
 }
 
 public double tan (rad :double) {
-    # Compiler end will fill this in
+    # Runtime will fill this in
 }
 
 public double sinh (x :double) {
-    # Compiler end will fill this in
+    # Runtime will fill this in
 }
 
 public double cosh (x :double) {
-    # Compiler end will fill this in
+    # Runtime will fill this in
 }
 
 public double tanh (x :double) {
-    # Compiler end will fill this in
+    # Runtime will fill this in
 }
 
 public double asin (x :double) {
-    # Compiler end will fill this in
+    # Runtime will fill this in
 }
 
 public double acos (x :double) {
-    # Compiler end will fill this in
+    # Runtime will fill this in
 }
 
 public double atan (x :double) {
-    # Compiler end will fill this in
+    # Runtime will fill this in
 }
 
 public double atan2 (y, x :double) {
-    # Compiler end will fill this in
+    # Runtime will fill this in
 }
