@@ -43,6 +43,13 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
 
     private static final List<Pass> OPT_PASSES = new ArrayList<>();
 
+    private static final UnaryType TYPE_BYTE = UnaryType.getType("byte");
+    private static final UnaryType TYPE_SHORT = UnaryType.getType("short");
+    private static final UnaryType TYPE_INT = UnaryType.getType("int");
+    private static final UnaryType TYPE_LONG = UnaryType.getType("long");
+    private static final UnaryType TYPE_FLOAT = UnaryType.getType("float");
+    private static final UnaryType TYPE_DOUBLE = UnaryType.getType("double");
+
     static {
         UNI_OP_MAPPING.put("+", new Tuple<>(Operation.UNARY_ADD, UnaryOperator.ADD));
         UNI_OP_MAPPING.put("-", new Tuple<>(Operation.UNARY_SUB, UnaryOperator.SUB));
@@ -382,6 +389,21 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
     }
 
     @Override
+    public Object visitStmts(StmtsContext ctx) {
+        if (ctx.ignore == null) {
+            visit(ctx.getChild(0));
+            if (ctx.assign != null) {
+                // assignStmt pushes a value onto the stack.
+                // that value is needed as an expression,
+                // but as a statement, it causes problems.
+                // remove it here
+                VALUE_STACK.pop();
+            }
+        }
+        return null;
+    }
+
+    @Override
     public Object visitBlock(BlockContext ctx) {
         // Blocks create a new scope depth
         currentScope.shift();
@@ -444,7 +466,9 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
             throw new IncompatibleTypeException(valueType, declType);
         }
 
-        funcStmts.add(new Statement(Operation.STORE_VAR, VALUE_STACK.pop(), Register.makeNamed(currentScope.getProcessedName(NAMING_STRAT, name))));
+        final Register dest = Register.makeNamed(currentScope.getProcessedName(NAMING_STRAT, name));
+        funcStmts.add(new Statement(Operation.STORE_VAR, VALUE_STACK.pop(), dest));
+        VALUE_STACK.push(dest);
 
         LOGGER.info("Assign type " + valueType + " to " + name + " :" + declType);
         return valueType;
@@ -639,11 +663,6 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
         return dispatchBinaryOperator(lhs, ctx.op.getText(), rhs);
     }
 
-    private static final UnaryType TYPE_BYTE = UnaryType.getType("byte");
-    private static final UnaryType TYPE_SHORT = UnaryType.getType("short");
-    private static final UnaryType TYPE_INT = UnaryType.getType("int");
-    private static final UnaryType TYPE_LONG = UnaryType.getType("long");
-
     private static Operation[] convertSeqToLong(final Type t) {
         if (TYPE_BYTE.isSameType(t)) {
             return new Operation[] { Operation.CONV_BYTE_INT, Operation.CONV_INT_LONG };
@@ -660,7 +679,7 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
         return null;
     }
 
-    private Operation[] makeUncastSequence(final boolean useLong, final Type t) {
+    private static Operation[] uncastLongSequence(final boolean useLong, final Type t) {
         if (TYPE_BYTE.isSameType(t)) {
             return new Operation[] { useLong ? Operation.CONV_LONG_INT : Operation.NOP, Operation.CONV_INT_BYTE };
         }
@@ -671,6 +690,49 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
             return new Operation[] { useLong ? Operation.CONV_LONG_INT : Operation.NOP };
         }
         return new Operation[0];
+    }
+
+    private static Operation[] convertSeqToFloat(final Type t) {
+        final Operation[] temp = convertSeqToLong(t);
+        if (temp == null) {
+            if (TYPE_FLOAT.isSameType(t)) {
+                return new Operation[] { Operation.NOP };
+            }
+            return null;
+        }
+
+        // Ints should directly go to float
+        if (temp[temp.length - 1] == Operation.CONV_INT_LONG) {
+            temp[temp.length - 1] = Operation.CONV_INT_FLOAT;
+            return temp;
+        }
+
+        final Operation[] actualConv = Arrays.copyOf(temp, temp.length + 1);
+        actualConv[actualConv.length - 1] = Operation.CONV_LONG_FLOAT;
+        return actualConv;
+    }
+
+    private static Operation[] convertSeqToDouble(final Type t) {
+        final Operation[] temp = convertSeqToLong(t);
+        if (temp == null) {
+            if (TYPE_FLOAT.isSameType(t)) {
+                return new Operation[] { Operation.CONV_FLOAT_DOUBLE };
+            }
+            if (TYPE_DOUBLE.isSameType(t)) {
+                return new Operation[] { Operation.NOP };
+            }
+            return null;
+        }
+
+        // Ints should directly go to double
+        if (temp[temp.length - 1] == Operation.CONV_INT_LONG) {
+            temp[temp.length - 1] = Operation.CONV_INT_DOUBLE;
+            return temp;
+        }
+
+        final Operation[] actualConv = Arrays.copyOf(temp, temp.length + 1);
+        actualConv[actualConv.length - 1] = Operation.CONV_LONG_DOUBLE;
+        return actualConv;
     }
 
     private Type dispatchBinaryOperator(Type lhs, String name, Type rhs) {
@@ -692,10 +754,9 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
 
         Operation[] cleanupSeq = new Operation[0];
 
-        final Operation[] aSeq = convertSeqToLong(rhs);
-        final Operation[] bSeq = convertSeqToLong(lhs);
-
-        if (aSeq != null && bSeq != null) {
+        Operation[] aSeq, bSeq;
+        if ((aSeq = convertSeqToLong(rhs)) != null
+                && (bSeq = convertSeqToLong(lhs)) != null) {
             boolean useLong = true;
 
             // Insert the conversion sequences
@@ -718,7 +779,31 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
             }
 
             // Downcast back to actual type is necessary
-            cleanupSeq = makeUncastSequence(useLong, result);
+            cleanupSeq = uncastLongSequence(useLong, result);
+        } else if ((aSeq = convertSeqToFloat(rhs)) != null
+                && (bSeq = convertSeqToFloat(lhs)) != null) {
+            a = applyRegisterTransfer(a, aSeq);
+            b = applyRegisterTransfer(b, bSeq);
+
+            switch (opcode) {
+                case BINARY_ADD: opcode = Operation.FLOAT_ADD; break;
+                case BINARY_SUB: opcode = Operation.FLOAT_SUB; break;
+                case BINARY_MUL: opcode = Operation.FLOAT_MUL; break;
+                case BINARY_DIV: opcode = Operation.FLOAT_DIV; break;
+                case BINARY_MOD: opcode = Operation.FLOAT_MOD; break;
+            }
+        } else if ((aSeq = convertSeqToDouble(rhs)) != null
+                && (bSeq = convertSeqToDouble(lhs)) != null) {
+            a = applyRegisterTransfer(a, aSeq);
+            b = applyRegisterTransfer(b, bSeq);
+
+            switch (opcode) {
+                case BINARY_ADD: opcode = Operation.DOUBLE_ADD; break;
+                case BINARY_SUB: opcode = Operation.DOUBLE_SUB; break;
+                case BINARY_MUL: opcode = Operation.DOUBLE_MUL; break;
+                case BINARY_DIV: opcode = Operation.DOUBLE_DIV; break;
+                case BINARY_MOD: opcode = Operation.DOUBLE_MOD; break;
+            }
         }
 
         funcStmts.add(new Statement(opcode, b, a, temporary));
@@ -779,7 +864,7 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
             }
 
             // Downcast back to actual type is necessary
-            cleanupSeq = makeUncastSequence(useLong, result);
+            cleanupSeq = uncastLongSequence(useLong, result);
         }
 
         funcStmts.add(new Statement(opcode, value, temporary));
@@ -813,16 +898,13 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
 
     @Override
     public Type visitExprNumber(ExprNumberContext ctx) {
-        final String text = ctx.getText();
-
-        boolean trimTail = true;
+        String text = ctx.getText();
 
         final Tuple<String, Integer> info = NUM_LIT_INFO.get(Character.toLowerCase(text.charAt(text.length() - 1)));
 
         final int size;
         final String typeName;
         if (info == null) {
-            trimTail = false;
             if (text.contains(".")) {
                 typeName = "double";
                 size = Double.SIZE;
@@ -831,12 +913,20 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
                 size = Integer.SIZE;
             }
         } else {
-            typeName = info.getA();
+            text = text.substring(0, text.length() - 1);
             size = info.getB();
+            switch ((typeName = info.getA())) {
+                case "float":
+                case "double":
+                    if (!text.contains(".")) {
+                        text += ".0";
+                    }
+                    break;
+            }
         }
 
         final Register temporary = Register.makeTemporary();
-        funcStmts.add(new Statement(Operation.LOAD_NUMERAL, new Fixnum(trimTail ? text.substring(0, text.length() - 1) : text, size), temporary));
+        funcStmts.add(new Statement(Operation.LOAD_NUMERAL, new Fixnum(text, size), temporary));
         VALUE_STACK.push(temporary);
 
         LOGGER.info("Literal " + text + " is a " + typeName);

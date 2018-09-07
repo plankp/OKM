@@ -14,8 +14,9 @@ public final class UnaryType implements Type {
         NUM_TYPE_DISTANCE.put("int", Integer.SIZE);
         NUM_TYPE_DISTANCE.put("long", Long.SIZE);
 
-        NUM_TYPE_DISTANCE.put("float", Float.SIZE);
-        NUM_TYPE_DISTANCE.put("double", Double.SIZE);
+        // See canConvertTo and handlePrimitiveMath for why the (1 + 2 *)
+        NUM_TYPE_DISTANCE.put("float",  1 + 2 * Float.SIZE);
+        NUM_TYPE_DISTANCE.put("double", 1 + 2 * Double.SIZE);
     }
 
     public final String name;
@@ -54,6 +55,7 @@ public final class UnaryType implements Type {
             final Integer a = NUM_TYPE_DISTANCE.get(this.name);
             final Integer b = NUM_TYPE_DISTANCE.get(other.name);
             if (a != null && b != null) {
+                // long and float actually causes float to be returned!
                 return a <= b;
             }
             return Objects.equals(this.name, other.name);

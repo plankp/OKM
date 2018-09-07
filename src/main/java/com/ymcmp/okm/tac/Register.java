@@ -42,4 +42,16 @@ public final class Register implements Serializable, Value {
     public String toString() {
         return name;
     }
+
+    @Override
+    public int hashCode() {
+        return name.hashCode();
+    }
+
+    @Override
+    public boolean equals(final Object obj) {
+        if (obj == this) return true;
+        if (obj == null) return false;
+        return obj.getClass() == this.getClass() && name.equals(((Register) obj).name);
+    }
 }

@@ -19,7 +19,7 @@ float power(base :float, exp :int) {
 int fact (n :int) = fact_aux(n: n, acc: 1)
 
 int fact_aux (n, acc :int) =
-    if n
+    if n < 2
         acc
     else
         fact_aux(n: n - 1, acc: n * acc)

@@ -5,6 +5,7 @@ import java.util.HashMap;
 
 import com.ymcmp.okm.tac.Value;
 import com.ymcmp.okm.tac.Fixnum;
+import com.ymcmp.okm.tac.Register;
 import com.ymcmp.okm.tac.Operation;
 import com.ymcmp.okm.tac.Statement;
 
@@ -17,22 +18,50 @@ public final class ConstantFoldPass implements Pass {
             final Statement stmt = block.get(i);
 
             if (safeIsTemporary(stmt.dst)) {
+                if (stmt.op == Operation.LOAD_NUMERAL) {
+                    // Remove temporaries
+                    replacement.put(stmt.dst.toString(), stmt.lhs);
+                    block.set(i--, new Statement(Operation.NOP));
+                    continue;
+                }
+            }
+
+            if (stmt.dst instanceof Register) {
                 switch (stmt.op) {
-                    case LOAD_NUMERAL:
-                        // Remove temporaries
-                        replacement.put(stmt.dst.toString(), stmt.lhs);
-                        block.set(i--, new Statement(Operation.NOP));
-                        continue;
                     case CONV_BYTE_INT:
                     case CONV_SHORT_INT:
                     case CONV_LONG_INT:
                     case CONV_INT_BYTE:
                     case CONV_INT_SHORT:
                     case CONV_INT_LONG:
+                    case CONV_FLOAT_DOUBLE:
                         if (safeIsNumeric(stmt.lhs)) {
-                            // Replace sequence to int value
-                            replacement.put(stmt.dst.toString(), ((Fixnum) stmt.lhs).changeSize(getResultSize(stmt.op)));
-                            block.set(i--, new Statement(Operation.NOP));
+                            final Value newValue = ((Fixnum) stmt.lhs).changeSize(getResultSize(stmt.op));
+                            replacement.put(stmt.dst.toString(), newValue);
+                            final Statement newStmt;
+                            if (stmt.dst.isTemporary()) {
+                                newStmt = new Statement(Operation.NOP);
+                            } else {
+                                newStmt = new Statement(Operation.LOAD_NUMERAL, newValue, stmt.dst);
+                            }
+                            block.set(i--, newStmt);
+                            continue;
+                        }
+                        break;
+                    case CONV_INT_FLOAT:
+                    case CONV_LONG_FLOAT:
+                    case CONV_INT_DOUBLE:
+                    case CONV_LONG_DOUBLE:
+                        if (safeIsNumeric(stmt.lhs)) {
+                            final Value newValue = new Fixnum(((Fixnum) stmt.lhs).value + ".0", getResultSize(stmt.op));
+                            replacement.put(stmt.dst.toString(), newValue);
+                            final Statement newStmt;
+                            if (stmt.dst.isTemporary()) {
+                                newStmt = new Statement(Operation.NOP);
+                            } else {
+                                newStmt = new Statement(Operation.LOAD_NUMERAL, newValue, stmt.dst);
+                            }
+                            block.set(i--, newStmt);
                             continue;
                         }
                         break;
@@ -43,8 +72,19 @@ public final class ConstantFoldPass implements Pass {
                 if (safeIsNumeric(stmt.lhs)) {
                     // Save these results, can perform substitution
                     replacement.put(stmt.dst.toString(), stmt.lhs);
-                } else {
-                    replacement.remove(stmt.dst.toString());
+                }
+            } else if (replacement.containsKey(safeToString(stmt.dst))) {
+                switch (stmt.op) {
+                    case PUSH_PARAM:
+                    case RETURN_VALUE: {
+                        final Value newDst = replacement.get(stmt.dst.toString());
+                        block.set(i--, new Statement(stmt.op, stmt.lhs, stmt.rhs, newDst));
+                        continue;
+                    }
+                    default:
+                        // This block will undo the previous substitution
+                        // because register is modified and cached value is wrong
+                        replacement.remove(stmt.dst.toString());
                 }
             }
 
@@ -60,17 +100,6 @@ public final class ConstantFoldPass implements Pass {
                 }
                 block.set(i--, new Statement(op, newLhs, newRhs, stmt.dst));
                 continue;
-            }
-
-            switch (stmt.op) {
-                case PUSH_PARAM:
-                case RETURN_VALUE: {
-                    final Value newDst = replacement.getOrDefault(safeToString(stmt.dst), stmt.dst);
-                    if (newDst != stmt.dst) {
-                        block.set(i--, new Statement(stmt.op, stmt.lhs, stmt.rhs, newDst));
-                        continue;
-                    }
-                }
             }
 
             // Ignore all float pointer optimizations!
@@ -131,12 +160,17 @@ public final class ConstantFoldPass implements Pass {
 
     private static int getResultSize(final Operation op) {
         switch (op) {
-            case CONV_BYTE_INT:  return Integer.SIZE;
-            case CONV_SHORT_INT: return Integer.SIZE;
-            case CONV_LONG_INT:  return Integer.SIZE;
-            case CONV_INT_BYTE:  return Byte.SIZE;
-            case CONV_INT_SHORT: return Short.SIZE;
-            case CONV_INT_LONG:  return Long.SIZE;
+            case CONV_BYTE_INT:     return Integer.SIZE;
+            case CONV_SHORT_INT:    return Integer.SIZE;
+            case CONV_LONG_INT:     return Integer.SIZE;
+            case CONV_INT_BYTE:     return Byte.SIZE;
+            case CONV_INT_SHORT:    return Short.SIZE;
+            case CONV_INT_LONG:     return Long.SIZE;
+            case CONV_INT_FLOAT:    return Float.SIZE;
+            case CONV_LONG_FLOAT:   return Float.SIZE;
+            case CONV_INT_DOUBLE:   return Double.SIZE;
+            case CONV_LONG_DOUBLE:  return Double.SIZE;
+            case CONV_FLOAT_DOUBLE: return Double.SIZE;
             default:
                 throw new AssertionError("Invalid casting operation " + op);
         }

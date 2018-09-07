@@ -79,10 +79,10 @@ importPath: unshift += DOT* (IDENT DOT)* IDENT;
 importDecl: IMPORT path = importPath sym = importSymb?;
 
 stmts:
-    SEMI
+    ignore = SEMI
     | variableDecl
     | returnStmt
-    | assignStmt
+    | assign = assignStmt
     | infSetStmt
     | ifStmt
     | fcallStmt

@@ -28,6 +28,13 @@ public enum Operation {
     CONV_INT_SHORT,
     CONV_INT_LONG,
 
+    CONV_INT_FLOAT,
+    CONV_LONG_FLOAT,
+
+    CONV_INT_DOUBLE,
+    CONV_LONG_DOUBLE,
+    CONV_FLOAT_DOUBLE,
+
     INT_NEG,
     INT_CPL,
 
@@ -45,6 +52,22 @@ public enum Operation {
     LONG_MUL,
     LONG_DIV,
     LONG_MOD,
+
+    FLOAT_NEG,
+
+    FLOAT_ADD,
+    FLOAT_SUB,
+    FLOAT_MUL,
+    FLOAT_DIV,
+    FLOAT_MOD,
+
+    DOUBLE_NEG,
+
+    DOUBLE_ADD,
+    DOUBLE_SUB,
+    DOUBLE_MUL,
+    DOUBLE_DIV,
+    DOUBLE_MOD,
 
     LOAD_TRUE,
     LOAD_FALSE,
