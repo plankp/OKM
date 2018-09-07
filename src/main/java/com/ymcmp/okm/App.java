@@ -7,6 +7,8 @@ import java.nio.file.Paths;
 
 import com.ymcmp.okm.tac.Statement;
 
+import com.ymcmp.okm.runtime.Machine;
+
 public class App {
 
     public static void main(String[] args) {
@@ -20,5 +22,10 @@ public class App {
             }
             System.out.println("");
         });
+
+        final Machine machine = new Machine();
+        machine.execute(result);
+        System.out.println("stack: " + machine.callStack);
+        System.out.println("local: " + machine.locals);
     }
 }

@@ -30,4 +30,14 @@ public final class Mutable<T extends Value> implements Serializable, Value {
     public String toString() {
         return mutable.toString();
     }
+
+    @Override
+    public int hashCode() {
+        return mutable.hashCode();
+    }
+
+    @Override
+    public boolean equals(final Object obj) {
+        return mutable == null && obj == null || mutable.equals(obj);
+    }
 }
