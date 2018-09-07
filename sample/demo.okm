@@ -56,6 +56,9 @@ int yield10() {
 
 unit demo3() {
     if false {
+        # None of this is in the final code
+        # since if false clearly never happens
+
         d :long
         a := 1 + -2
         b := true

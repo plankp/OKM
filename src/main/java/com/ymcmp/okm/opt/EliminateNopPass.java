@@ -27,16 +27,33 @@ public final class EliminateNopPass implements Pass {
             if (rhs != null) labels.add(rhs);
         }
 
-        // Eliminate NOPs and update label address
+        // Eliminate unreachable code (convert them to NOPs)
+        // In the mean time, eliminate NOPs and update label addresses
         for (int i = 0; i < block.size(); ++i) {
             final Statement stmt = block.get(i);
-            if (stmt.op == Operation.NOP) {
-                for (final Label label : labels) {
-                    final int addr = label.getAddress();
-                    if (addr > i) label.setAddress(addr - 1);
+            switch (stmt.op) {
+                case RETURN_UNIT:
+                case RETURN_VALUE: {
+                    // Check if any labels jump beyond this point
+                    // If not, wipe them
+                    int wipeOut = block.size();
+                    for (final Label label : labels) {
+                        final int addr = label.getAddress();
+                        if (addr < wipeOut) wipeOut = addr;
+                    }
+                    for (int j = i + 1; j < wipeOut; ++j) {
+                        block.set(j, new Statement(Operation.NOP));
+                    }
+                    continue;
                 }
-                block.remove(i--);
-                continue;
+                case NOP: {
+                    for (final Label label : labels) {
+                        final int addr = label.getAddress();
+                        if (addr > i) label.setAddress(addr - 1);
+                    }
+                    block.remove(i--);
+                    continue;
+                }
             }
         }
     }

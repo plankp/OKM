@@ -8,48 +8,72 @@ unit math() {
 
 public float power(base :float, exp :int) {
     # Runtime will fill this in
+    # compiler requires a dummy return
+    return 0
 }
 
 public double random() {
     # Runtime will fill this in
+    # compiler requires a dummy return
+    return 0
 }
 
 public double sin (rad :double) {
     # Runtime will fill this in
+    # compiler requires a dummy return
+    return 0
 }
 
 public double cos (rad :double) {
     # Runtime will fill this in
+    # compiler requires a dummy return
+    return 0
 }
 
 public double tan (rad :double) {
     # Runtime will fill this in
+    # compiler requires a dummy return
+    return 0
 }
 
 public double sinh (x :double) {
     # Runtime will fill this in
+    # compiler requires a dummy return
+    return 0
 }
 
 public double cosh (x :double) {
     # Runtime will fill this in
+    # compiler requires a dummy return
+    return 0
 }
 
 public double tanh (x :double) {
     # Runtime will fill this in
+    # compiler requires a dummy return
+    return 0
 }
 
 public double asin (x :double) {
     # Runtime will fill this in
+    # compiler requires a dummy return
+    return 0
 }
 
 public double acos (x :double) {
     # Runtime will fill this in
+    # compiler requires a dummy return
+    return 0
 }
 
 public double atan (x :double) {
     # Runtime will fill this in
+    # compiler requires a dummy return
+    return 0
 }
 
 public double atan2 (y, x :double) {
     # Runtime will fill this in
+    # compiler requires a dummy return
+    return 0
 }

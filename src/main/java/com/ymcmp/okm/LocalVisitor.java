@@ -220,6 +220,25 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
                 eliminateNop.process(mangledName, funcStmts);
             }
 
+            // Functions *must* end with either a GOTO, RETURN_UNIT, RETURN_VALUE, JUMP_IF_TRUE, JUMP_IF_FALSE, CALL or TAILCALL
+            if (funcStmts.isEmpty()) {
+                handleFunctionsWithoutReturn();
+            } else {
+                final Statement lastStmt = funcStmts.get(funcStmts.size() - 1);
+                switch (lastStmt.op) {
+                    case GOTO:
+                    case CALL:
+                    case TAILCALL:
+                    case RETURN_UNIT:
+                    case RETURN_VALUE:
+                    case JUMP_IF_TRUE:
+                    case JUMP_IF_FALSE:
+                        break;
+                    default:
+                        handleFunctionsWithoutReturn();
+                }
+            }
+
             // if function has the same name as the module and takes no parameters
             final String synthName = currentScope.functionName.substring(0, currentScope.functionName.length() - 1) + ".okm";
             if (currentFile.endsWith(synthName)) {
@@ -241,6 +260,15 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
         }
         pendingFunctions = oldPendingFunctions;
         return null;
+    }
+
+    private void handleFunctionsWithoutReturn() {
+        // If the return type is unit, we will add it
+        if (conformingType.isSameType(UnaryType.getType("unit"))) {
+            funcStmts.add(new Statement(Operation.RETURN_UNIT));
+        } else {
+            throw new RuntimeException("Function " + currentScope.functionName + " does not return!");
+        }
     }
 
     @Override
