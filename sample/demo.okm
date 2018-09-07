@@ -1,3 +1,4 @@
+import std.io
 import std.math(PI, :atan2(y, x), :sin(rad))
 
 import rel.vis
@@ -24,8 +25,24 @@ unit demo() {
     q = q           # This line will be optimized away
     p := q = k
 
-    return demo2(a: k);
+#    fact_5 := fact_aux (n: 5, acc: 1)
+    three := sum(a: 1, b: 2)
+    count_down(from: yield10())
+
+    return demo2(a: k)
 }
+
+unit count_down (from :int) =
+    if from
+        count_down(from: from - 1)
+    else
+        println(i: from)
+
+int fact_aux (n, acc :int) =
+    if n < 2
+        acc
+    else
+        fact_aux(n: n - 1, acc: n * acc)
 
 unit demo2(a :int) {
     # a :int;
@@ -38,13 +55,15 @@ int yield10() {
 }
 
 unit demo3() {
-    d :long
-    a := 1 + -2
-    b := true
-    c := a + 2
-    d = c
+    if false {
+        d :long
+        a := 1 + -2
+        b := true
+        c := a + 2
+        d = c
 
-    j := 0.1 + 0.2
+        j := 0.1 + 0.2
+    }
 
     # We manually return everything for now
     return
