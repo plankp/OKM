@@ -18,10 +18,16 @@ unit demo() {
 
     yield10();
 
-    return demo2();
+    k := 1s + -2b   # Size should be 16 not 32
+
+    q := 1
+    q = q           # This line will be optimized away
+    p := q = k
+
+    return demo2(a: k);
 }
 
-unit demo2() {
+unit demo2(a :int) {
     # a :int;
     # a = 1 + 2 (20);
     return
@@ -31,7 +37,7 @@ int yield10() {
     return 2 * 5 + 2 * 0
 }
 
-unit demo() {
+unit demo3() {
     d :long
     a := 1 + -2
     b := true
@@ -44,8 +50,6 @@ unit demo() {
     return
 }
 
-a, b :int
-
-unit add_extern() {
-    c := a + b
+int sum(a, b :int) {
+    return a + b
 }

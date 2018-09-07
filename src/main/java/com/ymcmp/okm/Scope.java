@@ -3,8 +3,10 @@ package com.ymcmp.okm;
 import java.io.Serializable;
 
 import java.util.Map;
+import java.util.Set;
 import java.util.HashMap;
 import java.util.ArrayDeque;
+import java.util.LinkedHashMap;
 
 import com.ymcmp.okm.type.Type;
 
@@ -27,11 +29,15 @@ public final class Scope implements Serializable {
 
     public void shift() {
         // HashMap is added to the front of the deque
-        this.locals.push(new HashMap<>());
+        this.locals.push(new LinkedHashMap<>());
     }
 
     public void unshift() {
         this.locals.pop();
+    }
+
+    public Set<String> getCurrentLocals() {
+        return locals.peek().keySet();
     }
 
     public void put(String name, Type type) {

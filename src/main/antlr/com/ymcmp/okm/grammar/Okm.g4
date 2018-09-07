@@ -74,7 +74,8 @@ symbolName:
     IDENT                                               # symVariable
     | COLON IDENT LPAREN ((IDENT COMMA)* IDENT)? RPAREN # symFunction;
 
-importSymb: LPAREN names += symbolName* RPAREN;
+importList: (symbolName COMMA)* symbolName;
+importSymb: LPAREN syms = importList RPAREN;
 importPath: unshift += DOT* (IDENT DOT)* IDENT;
 importDecl: IMPORT path = importPath sym = importSymb?;
 

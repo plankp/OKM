@@ -77,6 +77,7 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
 
         OPT_PASSES.add(new ReduceMovePass());
         OPT_PASSES.add(new ConstantFoldPass());
+        OPT_PASSES.add(new TailCallPass());
     }
 
     private final EntryNamingStrategy NAMING_STRAT = new EntryNamingStrategy() {
@@ -179,6 +180,12 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
 
             // Allocate function statement buffer
             funcStmts = new ArrayList<>();
+
+            // Callee retrieves arguments
+            for (final String param : currentScope.getCurrentLocals()) {
+                final Register slot = Register.makeNamed(currentScope.getProcessedName(NAMING_STRAT, param));
+                funcStmts.add(new Statement(Operation.POP_PARAM, slot));
+            }
 
             // Process function body here
             LOGGER.info("Process function body of " + currentScope.functionName);
@@ -310,11 +317,17 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
     }
 
     @Override
+    public List<String> visitImportList(ImportListContext ctx) {
+        final List<String> ret = new ArrayList<>();
+        for (int i = 0; i < ctx.getChildCount(); i += 2) {
+            ret.add((String) visit(ctx.getChild(i)));
+        }
+        return ret;
+    }
+
+    @Override
     public List<String> visitImportSymb(ImportSymbContext ctx) {
-        return ctx.names.stream()
-                .map(this::visit)
-                .map(e -> (String) e)
-                .collect(Collectors.toList());
+        return visitImportList(ctx.syms);
     }
 
     @Override
@@ -589,11 +602,6 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
         final Register temporary = Register.makeTemporary();
         funcStmts.add(new Statement(Operation.CALL, VALUE_STACK.pop(), temporary));
         VALUE_STACK.push(temporary);
-
-        // Caller cleans up arguments
-        for (int i = 0; i < args.length; ++i) {
-            funcStmts.add(new Statement(Operation.POP_PARAM));
-        }
 
         LOGGER.info("Call to type " + base + " yields " + result);
         return result;

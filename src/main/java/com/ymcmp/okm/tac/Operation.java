@@ -87,5 +87,6 @@ public enum Operation {
 
     PUSH_PARAM,
 
-    CALL;
+    CALL,
+    TAILCALL;
 }
