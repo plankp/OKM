@@ -11,6 +11,7 @@ import java.util.HashMap;
 import java.util.ArrayList;
 import java.util.ArrayDeque;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 
 import java.util.stream.Collectors;
 
@@ -97,7 +98,8 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
     private final Map<Path, Module> LOADED_MODULES = new HashMap<>();
     private final ArrayDeque<Value> VALUE_STACK = new ArrayDeque<>();
 
-    private final Map<String, List<Statement>> RESULT = new HashMap<>();
+    private final Map<String, List<Statement>> RESULT = new LinkedHashMap<>();
+    private final List<String> MODULE_INITS = new ArrayList<>();
 
     private Path currentFile;
     private Module currentModule;
@@ -113,7 +115,20 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
     public Map<String, List<Statement>> compile(final Path p) {
         RESULT.clear();
         processModule(p);
-        return new HashMap<>(RESULT);
+
+        // define a function called unit @init() { }
+        // which initializes all included modules
+        final List<Statement> initializer = new ArrayList<>();
+        for (final String func : MODULE_INITS) {
+            initializer.add(new Statement(Operation.CALL, Register.makeNamed(func), Register.makeTemporary()));
+        }
+        // Use RETURN_UNIT 
+        initializer.add(new Statement(Operation.RETURN_UNIT));
+        RESULT.put("@init", initializer);
+
+        Register.resetCounter();
+
+        return Collections.unmodifiableMap(RESULT);
     }
 
     public Module processModule(final Path p) {
@@ -203,6 +218,12 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
             for (final Pass pass : OPT_PASSES) {
                 pass.process(mangledName, funcStmts);
                 eliminateNop.process(mangledName, funcStmts);
+            }
+
+            // if function has the same name as the module and takes no parameters
+            final String synthName = currentScope.functionName.substring(0, currentScope.functionName.length() - 1) + ".okm";
+            if (currentFile.endsWith(synthName)) {
+                MODULE_INITS.add(mangledName);
             }
 
             RESULT.put(mangledName, funcStmts);
