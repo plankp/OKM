@@ -235,6 +235,9 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
 
             // Reset counter
             Register.resetCounter();
+
+            // Make currentScope null
+            currentScope = null;
         }
         pendingFunctions = oldPendingFunctions;
         return null;
