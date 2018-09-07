@@ -6,6 +6,9 @@ public final class Fixnum implements Serializable, Value {
 
     private static final long serialVersionUID = 62374902123L;
 
+    public static final Fixnum TRUE  = new Fixnum(1, Byte.SIZE);
+    public static final Fixnum FALSE = new Fixnum(0, Byte.SIZE);
+
     public final int size;
     public final String value;
 
@@ -42,6 +45,18 @@ public final class Fixnum implements Serializable, Value {
         this.value = Long.toString(value);
         this.size = Long.SIZE;
         this.isInt = true;
+    }
+
+    public Fixnum(double value) {
+        this.value = Double.toString(value);
+        this.size = Double.SIZE;
+        this.isInt = false;
+    }
+
+    public Fixnum(double value, int size) {
+        this.value = Double.toString(value);
+        this.size = size;
+        this.isInt = false;
     }
 
     public Fixnum changeSize(int size) {

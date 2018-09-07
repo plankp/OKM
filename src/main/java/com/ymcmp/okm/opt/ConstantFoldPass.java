@@ -17,12 +17,21 @@ public final class ConstantFoldPass implements Pass {
         for (int i = 0; i < block.size(); ++i) {
             final Statement stmt = block.get(i);
 
+            // Try remove temporaries
             if (safeIsTemporary(stmt.dst)) {
-                if (stmt.op == Operation.LOAD_NUMERAL) {
-                    // Remove temporaries
-                    replacement.put(stmt.dst.toString(), stmt.lhs);
-                    block.set(i--, new Statement(Operation.NOP));
-                    continue;
+                switch (stmt.op) {
+                    case LOAD_NUMERAL:
+                        replacement.put(stmt.dst.toString(), stmt.lhs);
+                        block.set(i--, new Statement(Operation.NOP));
+                        continue;
+                    case LOAD_TRUE:
+                        replacement.put(stmt.dst.toString(), Fixnum.TRUE);
+                        block.set(i--, new Statement(Operation.NOP));
+                        continue;
+                    case LOAD_FALSE:
+                        replacement.put(stmt.dst.toString(), Fixnum.FALSE);
+                        block.set(i--, new Statement(Operation.NOP));
+                        continue;
                 }
             }
 
@@ -68,24 +77,32 @@ public final class ConstantFoldPass implements Pass {
                 }
             }
 
-            if (stmt.op == Operation.LOAD_NUMERAL) {
-                if (safeIsNumeric(stmt.lhs)) {
-                    // Save these results, can perform substitution
-                    replacement.put(stmt.dst.toString(), stmt.lhs);
-                }
-            } else if (replacement.containsKey(safeToString(stmt.dst))) {
-                switch (stmt.op) {
-                    case PUSH_PARAM:
-                    case RETURN_VALUE: {
-                        final Value newDst = replacement.get(stmt.dst.toString());
-                        block.set(i--, new Statement(stmt.op, stmt.lhs, stmt.rhs, newDst));
-                        continue;
+            // Attempt to perform substitution
+            switch (stmt.op) {
+                case LOAD_NUMERAL:
+                    if (safeIsNumeric(stmt.lhs)) replacement.put(stmt.dst.toString(), stmt.lhs);
+                    break;
+                case LOAD_TRUE:
+                    replacement.put(stmt.dst.toString(), Fixnum.TRUE);
+                    break;
+                case LOAD_FALSE:
+                    replacement.put(stmt.dst.toString(), Fixnum.FALSE);
+                    break;
+                default:
+                    if (replacement.containsKey(safeToString(stmt.dst))) {
+                        switch (stmt.op) {
+                            case PUSH_PARAM:
+                            case RETURN_VALUE: {
+                                final Value newDst = replacement.get(stmt.dst.toString());
+                                block.set(i--, new Statement(stmt.op, stmt.lhs, stmt.rhs, newDst));
+                                continue;
+                            }
+                            default:
+                                // This block will undo the previous substitution
+                                // because register is modified and cached value is wrong
+                                replacement.remove(stmt.dst.toString());
+                        }
                     }
-                    default:
-                        // This block will undo the previous substitution
-                        // because register is modified and cached value is wrong
-                        replacement.remove(stmt.dst.toString());
-                }
             }
 
             final Value newLhs = replacement.getOrDefault(safeToString(stmt.lhs), stmt.lhs);
