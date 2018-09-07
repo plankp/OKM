@@ -8,6 +8,13 @@ public final class Label implements Serializable, Value {
 
     private int address;
 
+    public Label() {
+    }
+
+    public Label(int addr) {
+        this.address = addr;
+    }
+
     public int getAddress() {
         return this.address;
     }
