@@ -237,9 +237,8 @@ public class Machine {
                         i = -1; // invariant ++i will set it to zero
                         continue;
                     }
-                    default: {
-                        System.err.println("Undefined execute " + stmt.op);
-                    }
+                    default:
+                        throw new RuntimeException("Unknown opcode " + stmt.op);
                 }
             } catch (RuntimeException ex) {
                 throw new RuntimeException("RTE at " + i + " " + stmt, ex);
