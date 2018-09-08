@@ -126,18 +126,14 @@ public final class ConstantFoldPass implements Pass {
                     break;
                 default:
                     if (replacement.containsKey(safeToString(stmt.dst))) {
-                        switch (stmt.op) {
-                            case PUSH_PARAM:
-                            case RETURN_VALUE: {
-                                final Value newDst = replacement.get(stmt.dst.toString());
-                                block.set(i--, new Statement(stmt.op, stmt.lhs, stmt.rhs, newDst));
-                                continue;
-                            }
-                            default:
-                                // This block will undo the previous substitution
-                                // because register is modified and cached value is wrong
-                                replacement.remove(stmt.dst.toString());
+                        if (stmt.op.readsFromDst()) {
+                            final Value newDst = replacement.get(stmt.dst.toString());
+                            block.set(i--, new Statement(stmt.op, stmt.lhs, stmt.rhs, newDst));
+                            continue;
                         }
+                        // This block will undo the previous substitution
+                        // because register is modified and cached value is wrong
+                        replacement.remove(stmt.dst.toString());
                     }
             }
 
