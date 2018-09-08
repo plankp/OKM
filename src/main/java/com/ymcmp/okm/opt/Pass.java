@@ -10,6 +10,10 @@ public interface Pass {
 
     public void process(String funcName, List<Statement> block);
 
+    public default void reset() {
+        // Do nothing
+    }
+
     public default int getNextNonGotoOpAddress(final List<Statement> block, final int currentAddr) {
         int addr = currentAddr + 1;
         while (addr < block.size()) {

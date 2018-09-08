@@ -91,6 +91,16 @@ public enum Operation {
     CALL,
     TAILCALL;
 
+    public boolean readsFromDst() {
+        switch (this) {
+            case PUSH_PARAM:
+            case RETURN_VALUE:
+                return true;
+            default:
+                return false;
+        }
+    }
+
     public boolean branches() {
         switch (this) {
             case GOTO:
@@ -99,6 +109,34 @@ public enum Operation {
             case RETURN_VALUE:
             case JUMP_IF_TRUE:
             case JUMP_IF_FALSE:
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    public boolean hasPotentialSideEffects() {
+        switch (this) {
+            case UNARY_ADD:
+            case UNARY_SUB:
+            case UNARY_NOT:
+            case UNARY_TILDA:
+            case BINARY_ADD:
+            case BINARY_SUB:
+            case BINARY_MUL:
+            case BINARY_DIV:
+            case BINARY_MOD:
+            case BINARY_LESSER_THAN:
+            case BINARY_GREATER_THAN:
+            case BINARY_LESSER_EQUALS:
+            case BINARY_GREATER_EQUALS:
+            case BINARY_EQUALS:
+            case BINARY_NOT_EQUALS:
+            case STORE_VAR:
+            case PUSH_PARAM:
+            case POP_PARAM:
+            case CALL:
+            case TAILCALL:
                 return true;
             default:
                 return false;

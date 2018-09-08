@@ -79,6 +79,7 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
         OPT_PASSES.add(new ReduceMovePass());
         OPT_PASSES.add(new ConstantFoldPass());
         OPT_PASSES.add(new TailCallPass());
+        OPT_PASSES.add(new EliminateDeadCodePass());
     }
 
     private final EntryNamingStrategy NAMING_STRAT = new EntryNamingStrategy() {
@@ -213,29 +214,24 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
                 visitBlock(fctx.bodyBlock);
             }
 
-            // Optimization
+            // Functions *must* end with either a branching instruction
+            // next if block will be true If funcStmts does not end with a branch op
+            if (funcStmts.isEmpty() ? true : !funcStmts.get(funcStmts.size() - 1).op.branches()) {
+                // If the return type is unit, we will add it
+                if (conformingType.isSameType(UnaryType.getType("unit"))) {
+                    funcStmts.add(new Statement(Operation.RETURN_UNIT));
+                } else {
+                    throw new RuntimeException("Function " + currentScope.functionName + " does not return!");
+                }
+            }
+
+            // Perform optimization only if program is *correct*
             final EliminateNopPass eliminateNop = new EliminateNopPass();
             for (final Pass pass : OPT_PASSES) {
                 pass.process(mangledName, funcStmts);
+                pass.reset();
                 eliminateNop.process(mangledName, funcStmts);
-            }
-
-            // Functions *must* end with either a branching instruction
-            switch (funcStmts.isEmpty() ? Operation.NOP : funcStmts.get(funcStmts.size() - 1).op) {
-                case GOTO:
-                case TAILCALL:
-                case RETURN_UNIT:
-                case RETURN_VALUE:
-                case JUMP_IF_TRUE:
-                case JUMP_IF_FALSE:
-                    break;
-                default:
-                    // If the return type is unit, we will add it
-                    if (conformingType.isSameType(UnaryType.getType("unit"))) {
-                        funcStmts.add(new Statement(Operation.RETURN_UNIT));
-                    } else {
-                        throw new RuntimeException("Function " + currentScope.functionName + " does not return!");
-                    }
+                eliminateNop.reset();
             }
 
             // if function has the same name as the module and takes no parameters
