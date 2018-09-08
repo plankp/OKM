@@ -4,6 +4,8 @@ import java.io.Serializable;
 
 import java.math.BigDecimal;
 
+import java.util.Objects;
+
 public final class Fixnum implements Serializable, Value, Comparable<Fixnum> {
 
     private static final long serialVersionUID = 62374902123L;
@@ -82,9 +84,36 @@ public final class Fixnum implements Serializable, Value, Comparable<Fixnum> {
 
     @Override
     public int compareTo(final Fixnum other) {
+        if (value.equals("NaN")) {
+            return other.value.equals("NaN") ? 0 : 1;
+        }
+        if (other.value.equals("NaN")) {
+            return -1;
+        }
         final BigDecimal a = new BigDecimal(value);
         final BigDecimal b = new BigDecimal(other.value);
         return a.compareTo(b);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(size, value, isInt);
+    }
+
+    @Override
+    public boolean equals(final Object obj) {
+        if (obj == this) return true;
+        if (obj == null) return false;
+        if (obj.getClass() == this.getClass()) {
+            final Fixnum f = (Fixnum) obj;
+            if (value.equals("NaN") || f.value.equals("NaN")) {
+                // Handle special case which is NaN == NaN returns false
+                return false;
+            }
+            // Two are equal if they have same value, so 1.equals(1.0)
+            return compareTo(f) == 0;
+        }
+        return false;
     }
 
     private static String truncateValue(final long value, final int size) {
