@@ -2,7 +2,9 @@ package com.ymcmp.okm.tac;
 
 import java.io.Serializable;
 
-public final class Fixnum implements Serializable, Value {
+import java.math.BigDecimal;
+
+public final class Fixnum implements Serializable, Value, Comparable<Fixnum> {
 
     private static final long serialVersionUID = 62374902123L;
 
@@ -76,6 +78,13 @@ public final class Fixnum implements Serializable, Value {
     @Override
     public String toString() {
         return value + "_" + size;
+    }
+
+    @Override
+    public int compareTo(final Fixnum other) {
+        final BigDecimal a = new BigDecimal(value);
+        final BigDecimal b = new BigDecimal(other.value);
+        return a.compareTo(b);
     }
 
     private static String truncateValue(final long value, final int size) {

@@ -25,7 +25,9 @@ unit demo() {
     q = q           # This line will be optimized away
     p := q = k
 
-#    fact_5 := fact_aux (n: 5, acc: 1)
+    fact_5 := fact_aux (n: 5, acc: 1)
+    println(i: fact_5)
+
     three := sum(a: 1, b: 2)
     count_down(from: yield10())
 

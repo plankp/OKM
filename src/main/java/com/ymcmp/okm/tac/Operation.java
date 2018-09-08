@@ -13,6 +13,7 @@ public enum Operation {
     BINARY_MUL,
     BINARY_DIV,
     BINARY_MOD,
+
     BINARY_LESSER_THAN,
     BINARY_GREATER_THAN,
     BINARY_LESSER_EQUALS,

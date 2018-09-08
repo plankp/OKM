@@ -60,6 +60,24 @@ public class Machine {
                 case NOP:           // NOP              <ignore>
                     // NOP does nothing..
                     break;
+                case BINARY_LESSER_THAN: //             dst:result, lhs:a, rhs:b
+                    locals.put(stmt.dst, makeBool(((Comparable) fetchValue(stmt.lhs)).compareTo(fetchValue(stmt.rhs)) < 0));
+                    break;
+                case BINARY_GREATER_THAN: //            dst:result, lhs:a, rhs:b
+                    locals.put(stmt.dst, makeBool(((Comparable) fetchValue(stmt.lhs)).compareTo(fetchValue(stmt.rhs)) > 0));
+                    break;
+                case BINARY_LESSER_EQUALS: //           dst:result, lhs:a, rhs:b
+                    locals.put(stmt.dst, makeBool(((Comparable) fetchValue(stmt.lhs)).compareTo(fetchValue(stmt.rhs)) <= 0));
+                    break;
+                case BINARY_GREATER_EQUALS: //          dst:result, lhs:a, rhs:b
+                    locals.put(stmt.dst, makeBool(((Comparable) fetchValue(stmt.lhs)).compareTo(fetchValue(stmt.rhs)) >= 0));
+                    break;
+                case BINARY_EQUALS: //                  dst:result, lhs:a, rhs:b
+                    locals.put(stmt.dst, makeBool(fetchValue(stmt.lhs).equals(fetchValue(stmt.rhs))));
+                    break;
+                case BINARY_NOT_EQUALS: //              dst:result, lhs:a, rhs:b
+                    locals.put(stmt.dst, makeBool(!fetchValue(stmt.lhs).equals(fetchValue(stmt.rhs))));
+                    break;
                 case CONV_BYTE_INT: // CONV_BYTE_INT    dst:result, lhs:base
                 case CONV_SHORT_INT:// CONV_SHORT_INT   dst:result, lhs:base
                     locals.put(stmt.dst, new Fixnum(toInt(fetchValue(stmt.lhs))));
@@ -221,6 +239,10 @@ public class Machine {
 
     private Value fetchValue(final Value val) {
         return locals.getOrDefault(val, val);
+    }
+
+    private static Fixnum makeBool(final boolean b) {
+        return b ? Fixnum.TRUE : Fixnum.FALSE;
     }
 
     private static int toInt(final Value v) {
