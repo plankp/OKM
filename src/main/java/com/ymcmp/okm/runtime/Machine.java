@@ -89,7 +89,7 @@ public class Machine {
                         break;
                     case CONV_BYTE_INT: // CONV_BYTE_INT    dst:result, lhs:base
                     case CONV_SHORT_INT:// CONV_SHORT_INT   dst:result, lhs:base
-                        locals.put(stmt.dst, new Fixnum(toInt(fetchValue(stmt.lhs))));
+                        locals.put(stmt.dst, new Fixnum(toInt(fetchValue(stmt.lhs)), Integer.SIZE));
                         break;
                     case CONV_LONG_INT: // CONV_LONG_INT    dst:result, lhs:base
                         locals.put(stmt.dst, new Fixnum(toLong(fetchValue(stmt.lhs)), Integer.SIZE));
@@ -109,10 +109,10 @@ public class Machine {
                         locals.put(stmt.dst, new Fixnum(toDouble(fetchValue(stmt.lhs))));
                         break;
                     case INT_NEG:       // INT_NEG          dst:result, lhs:base
-                        locals.put(stmt.dst, new Fixnum(-toInt(fetchValue(stmt.lhs))));
+                        locals.put(stmt.dst, new Fixnum(-toInt(fetchValue(stmt.lhs)), Integer.SIZE));
                         break;
                     case INT_CPL:       // INT_CPL          dst:result, lhs:base
-                        locals.put(stmt.dst, new Fixnum(~toInt(fetchValue(stmt.lhs))));
+                        locals.put(stmt.dst, new Fixnum(~toInt(fetchValue(stmt.lhs)), Integer.SIZE));
                         break;
                     case INT_ADD:       // INT_ADD          dst:result, lhs:a, rhs:b
                         locals.put(stmt.dst, new Fixnum(toInt(fetchValue(stmt.lhs)) + toInt(fetchValue(stmt.rhs)), Integer.SIZE));
