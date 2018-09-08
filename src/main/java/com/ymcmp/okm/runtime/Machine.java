@@ -222,7 +222,7 @@ public class Machine {
                         callStack.push(fetchValue(stmt.dst));
                         break;
                     case CALL:          // CALL             dst:store, lhs:callsite
-                        locals.put(stmt.dst, execute(code, stmt.lhs.toString()));
+                        locals.put(stmt.dst, execute(code, fetchValue(stmt.lhs).toString()));
                         break;
                     case TAILCALL: {    // TAILCALL         dst:callsite
                         // Update parameter $list, reset counter $i and restart

@@ -25,11 +25,14 @@ unit demo() {
     q = q           # This line will be optimized away
     p := q = k
 
-    fact_5 := fact_aux (n: 5, acc: 1)
-    println(i: fact_5)
+    fact_10 := factorial(n: yield10())
+    println(i: fact_10)
 
     three := sum(a: 1, b: 2)
-    count_down(from: yield10())
+    count_down(from: yield10() * 10000)
+
+    callsite := if true :println(i) else :count_down(from)
+    callsite(50)
 
     return demo2(a: k)
 }
@@ -39,6 +42,9 @@ unit count_down (from :int) =
         count_down(from: from - 1)
     else
         println(i: from)
+
+int factorial (n :int) =
+    fact_aux(n: n, acc: 1)
 
 int fact_aux (n, acc :int) =
     if n < 2
