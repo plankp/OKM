@@ -227,11 +227,13 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
 
             // Perform optimization only if program is *correct*
             final EliminateNopPass eliminateNop = new EliminateNopPass();
-            for (final Pass pass : OPT_PASSES) {
-                pass.process(mangledName, funcStmts);
-                pass.reset();
-                eliminateNop.process(mangledName, funcStmts);
-                eliminateNop.reset();
+            for (int i = 0; i < 2; ++i) {
+                for (final Pass pass : OPT_PASSES) {
+                    pass.process(mangledName, funcStmts);
+                    pass.reset();
+                    eliminateNop.process(mangledName, funcStmts);
+                    eliminateNop.reset();
+                }
             }
 
             // if function has the same name as the module and takes no parameters
