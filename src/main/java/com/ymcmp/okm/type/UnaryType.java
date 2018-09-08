@@ -117,4 +117,9 @@ public final class UnaryType implements Type {
         }
         return null;
     }
+
+    @Override
+    public Type tryAccessAttribute(String attr) {
+        return null;
+    }
 }

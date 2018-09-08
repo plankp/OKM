@@ -394,7 +394,9 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
 
     @Override
     public Type visitType(TypeContext ctx) {
-        return UnaryType.getType(ctx.getText());
+        final String name = ctx.getText();
+        final Module.Entry ent = currentModule.getType(name);
+        return ent.type;
     }
 
     @Override
@@ -481,6 +483,25 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
                 currentModule.put(newVar.getA(), new Module.Entry(currentVisibility, newVar.getB(), currentFile));
             }
         }
+        return null;
+    }
+
+    @Override
+    public String[] visitEnumList(EnumListContext ctx) {
+        final String[] arr = new String[(ctx.getChildCount() + 1) / 2];
+        for (int i = 0; i < arr.length; ++i) {
+            arr[i] = ctx.getChild(i * 2).getText();
+        }
+        return arr;
+    }
+
+    @Override
+    public Object visitEnumDecl(EnumDeclContext ctx) {
+        final String name = ctx.name.getText();
+        final String[] keys = ctx.list == null ? new String[0] : visitEnumList(ctx.list);
+        final EnumType type = EnumType.makeEnum(name, keys);
+        LOGGER.info("Declare " + currentVisibility + " enum " + type);
+        currentModule.putType(name, new Module.Entry(currentVisibility, type, currentFile));
         return null;
     }
 
@@ -894,6 +915,37 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
     }
 
     @Override
+    public Type visitExprAccess(ExprAccessContext ctx) {
+        final String attr = ctx.attr.getText();
+        final int stackSize = VALUE_STACK.size();
+        final Type base = (Type) visit(ctx.base);
+
+        final Type result = base.tryAccessAttribute(attr);
+        if (result == null) {
+            throw new UndefinedOperationException("Type " + base + " does not allow accessing attribute " + attr);
+        }
+
+        final Register temporary = Register.makeTemporary();
+
+        if (stackSize == VALUE_STACK.size()) {
+            // Do not pop the value stack. Synthesize instructions
+            final String[] keys = ((EnumType) base).getKeys();
+            for (int i = 0; i < keys.length; ++i) {
+                if (keys[i].equals(attr)) {
+                    LOGGER.info(base + "." + attr + " yields " + result + "(" + i + ")");
+                    funcStmts.add(new Statement(Operation.LOAD_NUMERAL, new Fixnum(i, Integer.SIZE), temporary));
+                    break;
+                }
+            }
+        } else {
+            LOGGER.info(base + "." + attr + " yields " + result);
+            funcStmts.add(new Statement(Operation.ACCESS_ATTR, VALUE_STACK.pop(), Register.makeNamed(attr), temporary));
+        }
+        VALUE_STACK.push(temporary);
+        return result;
+    }
+
+    @Override
     public Type visitExprUnary(ExprUnaryContext ctx) {
         final String name = ctx.op.getText();
         final Tuple<Operation, UnaryOperator> tuple = UNI_OP_MAPPING.get(name);
@@ -947,10 +999,21 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
     public Type visitExprSymbol(ExprSymbolContext ctx) {
         final String symbol = (String) visit(ctx.getChild(0));
 
-        VALUE_STACK.push(Register.makeNamed(currentScope.getProcessedName(NAMING_STRAT, symbol)));
-
         LOGGER.info("Looking up symbol with internal name " + symbol);
-        return currentScope.get(symbol);
+        final Type symType = currentScope.get(symbol);
+
+        if (symType == null) {
+            LOGGER.info("It was not a symbol, checking if it is a type");
+            final Module.Entry typeId = currentModule.getType(symbol);
+            if (typeId == null) {
+                throw new UndefinedSymbolException(symbol);
+            }
+            return typeId.type;
+        } else {
+            VALUE_STACK.push(Register.makeNamed(currentScope.getProcessedName(NAMING_STRAT, symbol)));
+        }
+
+        return symType;
     }
 
     @Override

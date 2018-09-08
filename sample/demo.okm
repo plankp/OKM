@@ -3,6 +3,11 @@ import std.math(PI, :atan2(y, x), :sin(rad))
 
 import rel.vis
 
+# SPADES = 0, ..., CLUBS = 3
+# They have type Suit but has conversion to int
+# Ints cannot convert to Suit, however
+enum Suit(SPADES, HEARTS, DIAMONDS, CLUBS)
+
 # This function (since it has the same name as the module)
 # is used to initialize the module. Runtime automatically
 # call it (think of the static block in java). Since it is

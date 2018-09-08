@@ -23,6 +23,8 @@ DOUBLE: 'double';
 UNIT: 'unit';
 BOOL: 'bool';
 
+ENUM: 'enum';
+
 RETURN: 'return';
 
 TRUE: 'true';
@@ -68,6 +70,7 @@ decls:
         importDecl
         | functionDecl
         | variableDecl
+        | enumDecl
     );
 
 symbolName:
@@ -100,8 +103,8 @@ type:
     | LONG
     | FLOAT
     | DOUBLE
-    | UNIT
     | BOOL
+    | UNIT
     | IDENT;
 
 parameter: (IDENT COMMA)* IDENT COLON t = type;
@@ -113,6 +116,9 @@ functionDecl:
     );
 
 variableDecl: p = parameter;
+
+enumList: (IDENT COMMA)* IDENT;
+enumDecl: ENUM name = IDENT LPAREN list = enumList? RPAREN;
 
 returnStmt: RETURN value = expr?;
 
@@ -136,6 +142,7 @@ expr:
     | base = expr tail = rcallTail                     # exprRefCall
     | fcallStmt                                        # exprFuncCall
     | symbolName                                       # exprSymbol
+    | base = expr DOT attr = IDENT                     # exprAccess
     | op = (ADD | SUB | NOT | TILDA) rhs = expr        # exprUnary
     | lhs = expr op = (MUL | DIV | MOD) rhs = expr     # exprMulDivMod
     | lhs = expr op = (ADD | SUB) rhs = expr           # exprAddSub

@@ -76,4 +76,9 @@ public final class FuncType implements Type {
     public Type tryPerformBinary(BinaryOperator op, Type rhs) {
         return null;
     }
+
+    @Override
+    public Type tryAccessAttribute(String attr) {
+        return null;
+    }
 }

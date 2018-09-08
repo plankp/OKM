@@ -76,6 +76,8 @@ public enum Operation {
 
     STORE_VAR,
 
+    ACCESS_ATTR,
+
     RETURN_UNIT,
     RETURN_VALUE,
 

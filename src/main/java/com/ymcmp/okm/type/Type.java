@@ -17,4 +17,7 @@ public interface Type {
 
     // Return null if op cannot be done
     public Type tryPerformBinary(BinaryOperator op, Type rhs);
+
+    // Return null if access cannot be done
+    public Type tryAccessAttribute(String attr);
 }
