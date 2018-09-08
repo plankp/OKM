@@ -633,9 +633,30 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
             throw new UndefinedOperationException("Type " + base + " cannot be called with arguments: " + Arrays.toString(args));
         }
 
-        // Push from right to left
+        // Try to perform the correct type conversions then push from right to left
+        final FuncType ftype = (base instanceof FuncType) ? (FuncType) base : null;
         for (int i = 0; i < args.length; ++i) {
-            funcStmts.add(new Statement(Operation.PUSH_PARAM, VALUE_STACK.pop()));
+            Value val = VALUE_STACK.pop();
+            if (ftype != null && !args[i].isSameType(ftype.params[i])) {
+                // Implement type casting
+                final String synthName = args[i] + "_" + ftype.params[i];
+                switch (synthName) {
+                    case "byte_int":        val = applyRegisterTransfer(val, Operation.CONV_BYTE_INT); break;
+                    case "short_int":       val = applyRegisterTransfer(val, Operation.CONV_SHORT_INT); break;
+                    case "long_int":        val = applyRegisterTransfer(val, Operation.CONV_LONG_INT); break;
+                    case "int_byte":        val = applyRegisterTransfer(val, Operation.CONV_INT_BYTE); break;
+                    case "int_short":       val = applyRegisterTransfer(val, Operation.CONV_INT_SHORT); break;
+                    case "int_long":        val = applyRegisterTransfer(val, Operation.CONV_INT_LONG); break;
+                    case "int_float":       val = applyRegisterTransfer(val, Operation.CONV_INT_FLOAT); break;
+                    case "long_float":      val = applyRegisterTransfer(val, Operation.CONV_LONG_FLOAT); break;
+                    case "int_double":      val = applyRegisterTransfer(val, Operation.CONV_INT_DOUBLE); break;
+                    case "long_double":     val = applyRegisterTransfer(val, Operation.CONV_LONG_DOUBLE); break;
+                    case "float_double":    val = applyRegisterTransfer(val, Operation.CONV_FLOAT_DOUBLE); break;
+                    default:
+                        throw new AssertionError("Unknown conversion rule: " + synthName);
+                }
+            }
+            funcStmts.add(new Statement(Operation.PUSH_PARAM, val));
         }
         final Register temporary = Register.makeTemporary();
         funcStmts.add(new Statement(Operation.CALL, VALUE_STACK.pop(), temporary));
