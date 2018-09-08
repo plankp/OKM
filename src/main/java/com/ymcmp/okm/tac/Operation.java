@@ -90,4 +90,18 @@ public enum Operation {
 
     CALL,
     TAILCALL;
+
+    public boolean branches() {
+        switch (this) {
+            case GOTO:
+            case TAILCALL:
+            case RETURN_UNIT:
+            case RETURN_VALUE:
+            case JUMP_IF_TRUE:
+            case JUMP_IF_FALSE:
+                return true;
+            default:
+                return false;
+        }
+    }
 }

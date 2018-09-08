@@ -75,5 +75,14 @@ unit demo3() {
 }
 
 int sum(a, b :int) {
+    c :int
+
+    if a {
+        c = 10
+    } else {
+        c = 11
+    }
+
+    println(i: c)
     return a + b
 }

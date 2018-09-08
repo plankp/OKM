@@ -3,6 +3,7 @@ package com.ymcmp.okm.opt;
 import java.util.List;
 import java.util.HashMap;
 
+import com.ymcmp.okm.tac.Label;
 import com.ymcmp.okm.tac.Value;
 import com.ymcmp.okm.tac.Fixnum;
 import com.ymcmp.okm.tac.Register;
@@ -13,24 +14,59 @@ public final class ConstantFoldPass implements Pass {
 
     @Override
     public void process(final String fname, final List<Statement> block) {
+        int startIdx = 0;
+        for (int i = 0; i < block.size(); ++i) {
+            // Consider follow code fragment
+            //   0 POP_PARAM $a_0
+            //   1 (4) <- JUMP_IF_TRUE $a_0
+            //   2 %T0 <- LOAD_NUMERAL 10
+            //   3 GOTO (5)
+            //   4 %T0 <- LOAD_NUMERAL 11
+            //   5 RETURN_VALUE %T0
+            // Realize the jumps have to taken into account when folding constants.
+            // If ignore jumps, RETURN_VALUE will be fixed with either 10 or 11,
+            // which is incorrect (since it ignores $a_0 JUMP_IF_TRUE judgement).
+            //
+            // Correct handling will be to process in (inclusive) (0, 1), (1, 3),
+            // (3, 5) and (5, 5). When processing, these will use different
+            // replacement maps. Also, that means LOAD* cannot eagerly dispose
+            // themselves. That has to be done separately.
+
+            final Statement stmt = block.get(i);
+            if (stmt.op.branches()) {
+                // Analyze on inclusive range startIdx and stmt's instruction
+                final int endIdx = i + 1;
+                unfoldConstants(fname, block.subList(startIdx, endIdx));
+                startIdx = endIdx;
+
+                if (stmt.op == Operation.GOTO) {
+                    final int brAddr = ((Label) stmt.dst).getAddress();
+                    if (brAddr >= endIdx) {
+                        // Analyze on inclusive range startIdx and brAddr
+                        unfoldConstants(fname, block.subList(startIdx, brAddr));
+                        i = (startIdx = brAddr) - 1;
+                    }
+                }
+            }
+        }
+    }
+
+    private void unfoldConstants(final String fname, final List<Statement> block) {
         final HashMap<String, Value> replacement = new HashMap<>();
         for (int i = 0; i < block.size(); ++i) {
             final Statement stmt = block.get(i);
 
-            // Try remove temporaries
+            // Try substitute temporaries
             if (safeIsTemporary(stmt.dst)) {
                 switch (stmt.op) {
                     case LOAD_NUMERAL:
                         replacement.put(stmt.dst.toString(), stmt.lhs);
-                        block.set(i--, new Statement(Operation.NOP));
                         continue;
                     case LOAD_TRUE:
                         replacement.put(stmt.dst.toString(), Fixnum.TRUE);
-                        block.set(i--, new Statement(Operation.NOP));
                         continue;
                     case LOAD_FALSE:
                         replacement.put(stmt.dst.toString(), Fixnum.FALSE);
-                        block.set(i--, new Statement(Operation.NOP));
                         continue;
                 }
             }
