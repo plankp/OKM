@@ -29,23 +29,33 @@ public final class EliminateNopPass implements Pass {
 
         // Eliminate unreachable code (convert them to NOPs)
         // In the mean time, eliminate NOPs and update label addresses
+        outer:
         for (int i = 0; i < block.size(); ++i) {
             final Statement stmt = block.get(i);
             switch (stmt.op) {
-                case RETURN_UNIT:
-                case RETURN_VALUE: {
-                    // Check if any labels jump beyond this point
-                    // If not, wipe them
-                    int wipeOut = block.size();
-                    for (final Label label : labels) {
-                        final int addr = label.getAddress();
-                        if (addr < wipeOut) wipeOut = addr;
-                    }
-                    for (int j = i + 1; j < wipeOut; ++j) {
-                        block.set(j, new Statement(Operation.NOP));
+                case GOTO: {
+                    // Example:
+                    // 0 %T0 <- STORE_VAR $fptrA_0
+                    // 1 GOTO (3)
+                    // 2 %T0 <- STORE_VAR $fptrB_0
+                    // 3 $callsite_1 <- STORE_VAR %T0
+                    // 4 %T1 <- CALL $callsite_1
+                    // Inclusive (1, 2) is unreachable given no code jumps to (2)
+                    final int dst = ((Label) stmt.dst).getAddress();
+                    if (dst == i + 1) {
+                        // Special case, just eliminate the GOTO statement
+                        block.set(i--, new Statement(Operation.NOP));
+                    } else if (dst > i) {
+                        purgeUnreachedCode(block, labels, i, dst);
                     }
                     continue;
                 }
+                case RETURN_UNIT:
+                case RETURN_VALUE:
+                    // Special case of GOTO's example: everything after this
+                    // instruction can be purged
+                    purgeUnreachedCode(block, labels, i, block.size());
+                    continue;
                 case NOP: {
                     for (final Label label : labels) {
                         final int addr = label.getAddress();
@@ -55,6 +65,26 @@ public final class EliminateNopPass implements Pass {
                     continue;
                 }
             }
+        }
+    }
+
+    private void purgeUnreachedCode(final List<Statement> block, final List<Label> labels, final int start, final int maxWipeRange) {
+        int wipeOut = maxWipeRange;
+        for (final Label label : labels) {
+            final int addr = label.getAddress();
+            if (start < addr && addr < wipeOut) {
+                // Code is still reachable beyond addr,
+                // discard everything up until that point
+                wipeOut = addr;
+            }
+        }
+        // Code range is unreachable. Wipe them
+        wipeRange(block, start + 1, wipeOut);
+    }
+
+    private void wipeRange(final List<Statement> block, final int start, final int end) {
+        for (int i = start; i < end; ++i) {
+            block.set(i, new Statement(Operation.NOP));
         }
     }
 
