@@ -6,7 +6,6 @@ import com.ymcmp.okm.except.DuplicateSymbolException;
 
 public final class EnumType implements Type {
 
-    private static final UnaryType TYPE_INT = UnaryType.getType("int");
     private static final HashMap<String, String[]> KEYS = new HashMap<>();
 
     public final String name;
@@ -27,6 +26,10 @@ public final class EnumType implements Type {
         return KEYS.get(name);
     }
 
+    public EnumKeyType createCorrespondingKey() {
+        return new EnumKeyType(name);
+    }
+
     @Override
     public boolean isSameType(Type t) {
         if (t instanceof EnumType) {
@@ -37,26 +40,22 @@ public final class EnumType implements Type {
 
     @Override
     public boolean canConvertTo(Type t) {
-        // It acts like an int, ints do not act like enums though!
-        return this.isSameType(t) || TYPE_INT.canConvertTo(t);
+        return this.isSameType(t);
     }
 
     @Override
     public Type tryPerformCall(Type... args) {
-        // Act like an int
-        return TYPE_INT.tryPerformCall(args);
+        return null;
     }
 
     @Override
     public Type tryPerformUnary(UnaryOperator op) {
-        // Act like an int
-        return TYPE_INT.tryPerformUnary(op);
+        return null;
     }
 
     @Override
     public Type tryPerformBinary(BinaryOperator op, Type rhs) {
-        // Act like an int
-        return TYPE_INT.tryPerformBinary(op, rhs);
+        return null;
     }
 
     @Override
@@ -65,7 +64,7 @@ public final class EnumType implements Type {
         final String[] keys = getKeys();
         for (final String key : keys) {
             if (key.equals(attr)) {
-                return this;
+                return createCorrespondingKey();
             }
         }
         return null;
@@ -73,6 +72,6 @@ public final class EnumType implements Type {
 
     @Override
     public String toString() {
-        return name;
+        return "enum " + name;
     }
 }

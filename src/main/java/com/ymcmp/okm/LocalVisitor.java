@@ -101,6 +101,7 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
 
     private final Map<String, List<Statement>> RESULT = new LinkedHashMap<>();
     private final List<String> MODULE_INITS = new ArrayList<>();
+    private final List<Statement> PRE_INIT_STMTS = new ArrayList<>();
 
     private Path currentFile;
     private Module currentModule;
@@ -110,7 +111,6 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
     private Type conformingType;
     private List<Statement> funcStmts;
 
-    private List<Tuple<Visibility, ImportDeclContext>> pendingImports;
     private List<Tuple<Scope, FunctionDeclContext>> pendingFunctions;
 
     public Map<String, List<Statement>> compile(final Path p) {
@@ -118,8 +118,11 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
         processModule(p);
 
         // define a function called unit @init() { }
-        // which initializes all included modules
+        // which performs initializations
         final List<Statement> initializer = new ArrayList<>();
+        // Perform pre-initialization (such as setting up enums)
+        initializer.addAll(PRE_INIT_STMTS);
+        // Initializes all included modules
         for (final String func : MODULE_INITS) {
             initializer.add(new Statement(Operation.CALL, Register.makeNamed(func), Register.makeTemporary()));
         }
@@ -165,19 +168,10 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
     @Override
     public Object visitProgram(final ProgramContext ctx) {
         // Save
-        final List<Tuple<Visibility, ImportDeclContext>> oldPendingImports = pendingImports;
-        pendingImports = new ArrayList<>();
         final List<Tuple<Scope, FunctionDeclContext>> oldPendingFunctions = pendingFunctions;
         pendingFunctions = new ArrayList<>();
 
         visitChildren(ctx);
-
-        // Process delayed imports
-        for (final Tuple<Visibility, ImportDeclContext> tuple : pendingImports) {
-            currentVisibility = tuple.getA();
-            visitImportDecl(tuple.getB());
-        }
-        pendingImports = oldPendingImports;
 
         // Process functions after imported symbols are processed
         for (final Tuple<Scope, FunctionDeclContext> funcInfo : pendingFunctions) {
@@ -276,13 +270,7 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
             currentVisibility = Visibility.valueOf(ctx.accMod.getText().toUpperCase());
         }
 
-        final ParseTree tree = ctx.getChild(ctx.getChildCount() - 1);
-        if (tree instanceof ImportDeclContext) {
-            // Delay processing imports
-            pendingImports.add(new Tuple(currentVisibility, (ImportDeclContext) tree));
-        } else {
-            visit(tree);
-        }
+        visit(ctx.getChild(ctx.getChildCount() - 1));
 
         currentVisibility = oldVisibility;
         return null;
@@ -395,8 +383,15 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
     @Override
     public Type visitType(TypeContext ctx) {
         final String name = ctx.getText();
-        final Module.Entry ent = currentModule.getType(name);
-        return ent.type;
+        final Module.Entry ent = currentModule.get(name);
+        if (ent.isType) {
+            final Type t = ent.type;
+            if (t instanceof EnumType) {
+                return ((EnumType) t).createCorrespondingKey();
+            }
+            return t;
+        }
+        throw new UndefinedOperationException(name + " does not name a type");
     }
 
     @Override
@@ -427,7 +422,7 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
         final String name = Module.makeFuncName(base, params.stream().map(Tuple::getA).toArray(String[]::new));
         final Type[] paramType = params.stream().map(Tuple::getB).toArray(Type[]::new);
         LOGGER.info("Declare " + currentVisibility + " function " + name);
-        currentModule.put(name, new Module.Entry(currentVisibility, new FuncType(ret, paramType), currentFile));
+        currentModule.put(name, Module.Entry.newVariable(currentVisibility, new FuncType(ret, paramType), currentFile));
 
         // Construct the function scope since all the required info is already present
         final Scope funcBodyScope = new Scope(name, currentModule);
@@ -480,7 +475,7 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
             } else {
                 // This is a module level variable
                 LOGGER.info("Declare " + currentVisibility + " variable " + newVar.getA() + " as type " + newVar.getB());
-                currentModule.put(newVar.getA(), new Module.Entry(currentVisibility, newVar.getB(), currentFile));
+                currentModule.put(newVar.getA(), Module.Entry.newVariable(currentVisibility, newVar.getB(), currentFile));
             }
         }
         return null;
@@ -500,8 +495,10 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
         final String name = ctx.name.getText();
         final String[] keys = ctx.list == null ? new String[0] : visitEnumList(ctx.list);
         final EnumType type = EnumType.makeEnum(name, keys);
-        LOGGER.info("Declare " + currentVisibility + " enum " + type);
-        currentModule.putType(name, new Module.Entry(currentVisibility, type, currentFile));
+        LOGGER.info("Declare " + currentVisibility + " " + type + " with keys " + Arrays.toString(keys));
+        final Module.Entry entry = Module.Entry.newType(currentVisibility, type, currentFile);
+        currentModule.put(name, entry);
+        PRE_INIT_STMTS.add(new Statement(Operation.LOAD_ENUM, new EnumKeys(keys), Register.makeNamed(NAMING_STRAT.name(entry, name))));
         return null;
     }
 
@@ -660,23 +657,31 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
         final FuncType ftype = (base instanceof FuncType) ? (FuncType) base : null;
         for (int i = 0; i < args.length; ++i) {
             Value val = VALUE_STACK.pop();
-            if (ftype != null && !args[i].isSameType(ftype.params[i])) {
-                // Implement type casting
-                final String synthName = args[i] + "_" + ftype.params[i];
-                switch (synthName) {
-                    case "byte_int":        val = applyRegisterTransfer(val, Operation.CONV_BYTE_INT); break;
-                    case "short_int":       val = applyRegisterTransfer(val, Operation.CONV_SHORT_INT); break;
-                    case "long_int":        val = applyRegisterTransfer(val, Operation.CONV_LONG_INT); break;
-                    case "int_byte":        val = applyRegisterTransfer(val, Operation.CONV_INT_BYTE); break;
-                    case "int_short":       val = applyRegisterTransfer(val, Operation.CONV_INT_SHORT); break;
-                    case "int_long":        val = applyRegisterTransfer(val, Operation.CONV_INT_LONG); break;
-                    case "int_float":       val = applyRegisterTransfer(val, Operation.CONV_INT_FLOAT); break;
-                    case "long_float":      val = applyRegisterTransfer(val, Operation.CONV_LONG_FLOAT); break;
-                    case "int_double":      val = applyRegisterTransfer(val, Operation.CONV_INT_DOUBLE); break;
-                    case "long_double":     val = applyRegisterTransfer(val, Operation.CONV_LONG_DOUBLE); break;
-                    case "float_double":    val = applyRegisterTransfer(val, Operation.CONV_FLOAT_DOUBLE); break;
-                    default:
-                        throw new AssertionError("Unknown conversion rule: " + synthName);
+            Type argType = args[i];
+            Type paramType = null;
+            if (ftype != null && !argType.isSameType((paramType = ftype.params[i]))) {
+                if (argType instanceof EnumKeyType) {
+                    // hack: we redo the above routine as if argType was int
+                    argType = TYPE_INT;
+                }
+                if (!argType.isSameType(paramType)) {
+                    // Implement type casting
+                    final String synthName = argType + "_" + paramType;
+                    switch (synthName) {
+                        case "byte_int":        val = applyRegisterTransfer(val, Operation.CONV_BYTE_INT); break;
+                        case "short_int":       val = applyRegisterTransfer(val, Operation.CONV_SHORT_INT); break;
+                        case "long_int":        val = applyRegisterTransfer(val, Operation.CONV_LONG_INT); break;
+                        case "int_byte":        val = applyRegisterTransfer(val, Operation.CONV_INT_BYTE); break;
+                        case "int_short":       val = applyRegisterTransfer(val, Operation.CONV_INT_SHORT); break;
+                        case "int_long":        val = applyRegisterTransfer(val, Operation.CONV_INT_LONG); break;
+                        case "int_float":       val = applyRegisterTransfer(val, Operation.CONV_INT_FLOAT); break;
+                        case "long_float":      val = applyRegisterTransfer(val, Operation.CONV_LONG_FLOAT); break;
+                        case "int_double":      val = applyRegisterTransfer(val, Operation.CONV_INT_DOUBLE); break;
+                        case "long_double":     val = applyRegisterTransfer(val, Operation.CONV_LONG_DOUBLE); break;
+                        case "float_double":    val = applyRegisterTransfer(val, Operation.CONV_FLOAT_DOUBLE); break;
+                        default:
+                            throw new AssertionError("Unknown conversion rule: " + synthName);
+                    }
                 }
             }
             funcStmts.add(new Statement(Operation.PUSH_PARAM, val));
@@ -917,7 +922,6 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
     @Override
     public Type visitExprAccess(ExprAccessContext ctx) {
         final String attr = ctx.attr.getText();
-        final int stackSize = VALUE_STACK.size();
         final Type base = (Type) visit(ctx.base);
 
         final Type result = base.tryAccessAttribute(attr);
@@ -927,20 +931,11 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
 
         final Register temporary = Register.makeTemporary();
 
-        if (stackSize == VALUE_STACK.size()) {
-            // Do not pop the value stack. Synthesize instructions
-            final String[] keys = ((EnumType) base).getKeys();
-            for (int i = 0; i < keys.length; ++i) {
-                if (keys[i].equals(attr)) {
-                    LOGGER.info(base + "." + attr + " yields " + result + "(" + i + ")");
-                    funcStmts.add(new Statement(Operation.LOAD_NUMERAL, new Fixnum(i, Integer.SIZE), temporary));
-                    break;
-                }
-            }
-        } else {
-            LOGGER.info(base + "." + attr + " yields " + result);
-            funcStmts.add(new Statement(Operation.ACCESS_ATTR, VALUE_STACK.pop(), Register.makeNamed(attr), temporary));
-        }
+        LOGGER.info(base + "." + attr + " yields " + result);
+        funcStmts.add(new Statement(
+                base instanceof EnumType ? Operation.LOAD_ENUM_KEY : Operation.ACCESS_ATTR,
+                VALUE_STACK.pop(),
+                Register.makeNamed(attr), temporary));
         VALUE_STACK.push(temporary);
         return result;
     }
@@ -1003,15 +998,10 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
         final Type symType = currentScope.get(symbol);
 
         if (symType == null) {
-            LOGGER.info("It was not a symbol, checking if it is a type");
-            final Module.Entry typeId = currentModule.getType(symbol);
-            if (typeId == null) {
-                throw new UndefinedSymbolException(symbol);
-            }
-            return typeId.type;
-        } else {
-            VALUE_STACK.push(Register.makeNamed(currentScope.getProcessedName(NAMING_STRAT, symbol)));
+            throw new UndefinedSymbolException(symbol);
         }
+
+        VALUE_STACK.push(Register.makeNamed(currentScope.getProcessedName(NAMING_STRAT, symbol)));
 
         return symType;
     }

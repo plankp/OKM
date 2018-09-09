@@ -73,6 +73,8 @@ public enum Operation {
     LOAD_TRUE,
     LOAD_FALSE,
     LOAD_NUMERAL,
+    LOAD_ENUM,
+    LOAD_ENUM_KEY,
 
     STORE_VAR,
 

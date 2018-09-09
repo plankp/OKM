@@ -23,20 +23,30 @@ public final class Module implements Serializable {
         public final Visibility visibility;
         public final Type type;
         public final Path source;
+        public final boolean isType;
 
-        public Entry(Visibility vis, Type type, Path source) {
+        public Entry(Visibility vis, Type type, Path source, boolean isType) {
             this.visibility = vis;
             this.type = type;
             this.source = source;
+            this.isType = isType;
+        }
+
+        public static Entry newType(Visibility vis, Type type, Path source) {
+            return new Entry(vis, type, source, true);
+        }
+
+        public static Entry newVariable(Visibility vis, Type type, Path source) {
+            return new Entry(vis, type, source, false);
         }
 
         public Entry changeVisibility(Visibility newVis) {
-            return new Entry(newVis, this.type, this.source);
+            return new Entry(newVis, this.type, this.source, this.isType);
         }
 
         @Override
         public int hashCode() {
-            return Objects.hash(visibility, type, source);
+            return Objects.hash(visibility, type, source, isType);
         }
 
         @Override
@@ -48,6 +58,7 @@ public final class Module implements Serializable {
             if (obj.getClass() == Entry.class) {
                 final Entry other = (Entry) obj;
                 return visibility == other.visibility
+                        && isType == isType
                         && type.isSameType(other.type)
                         && Objects.equals(source, other.source);
             }
@@ -58,20 +69,19 @@ public final class Module implements Serializable {
     private static final HashMap<String, Entry> PREDEF_TYPES = new HashMap<>();
 
     static {
-        PREDEF_TYPES.put("byte", new Entry(Visibility.PUBLIC, UnaryType.getType("byte"), null));
-        PREDEF_TYPES.put("char", new Entry(Visibility.PUBLIC, UnaryType.getType("char"), null));
-        PREDEF_TYPES.put("short", new Entry(Visibility.PUBLIC, UnaryType.getType("short"), null));
-        PREDEF_TYPES.put("int", new Entry(Visibility.PUBLIC, UnaryType.getType("int"), null));
-        PREDEF_TYPES.put("long", new Entry(Visibility.PUBLIC, UnaryType.getType("long"), null));
-        PREDEF_TYPES.put("float", new Entry(Visibility.PUBLIC, UnaryType.getType("float"), null));
-        PREDEF_TYPES.put("double", new Entry(Visibility.PUBLIC, UnaryType.getType("double"), null));
-        PREDEF_TYPES.put("unit", new Entry(Visibility.PUBLIC, UnaryType.getType("unit"), null));
-        PREDEF_TYPES.put("bool", new Entry(Visibility.PUBLIC, UnaryType.getType("bool"), null));
+        PREDEF_TYPES.put("byte", new Entry(Visibility.PUBLIC, UnaryType.getType("byte"), null, true));
+        PREDEF_TYPES.put("char", new Entry(Visibility.PUBLIC, UnaryType.getType("char"), null, true));
+        PREDEF_TYPES.put("short", new Entry(Visibility.PUBLIC, UnaryType.getType("short"), null, true));
+        PREDEF_TYPES.put("int", new Entry(Visibility.PUBLIC, UnaryType.getType("int"), null, true));
+        PREDEF_TYPES.put("long", new Entry(Visibility.PUBLIC, UnaryType.getType("long"), null, true));
+        PREDEF_TYPES.put("float", new Entry(Visibility.PUBLIC, UnaryType.getType("float"), null, true));
+        PREDEF_TYPES.put("double", new Entry(Visibility.PUBLIC, UnaryType.getType("double"), null, true));
+        PREDEF_TYPES.put("unit", new Entry(Visibility.PUBLIC, UnaryType.getType("unit"), null, true));
+        PREDEF_TYPES.put("bool", new Entry(Visibility.PUBLIC, UnaryType.getType("bool"), null, true));
     }
 
     // No NULL entries allowed!
-    private final HashMap<String, Entry> map = new HashMap<>();
-    private final HashMap<String, Entry> type = new HashMap<>(PREDEF_TYPES);
+    private final HashMap<String, Entry> map = new HashMap<>(PREDEF_TYPES);
 
     public Set<Map.Entry<String, Module.Entry>> entrySet() {
         return map.entrySet();
@@ -92,7 +102,7 @@ public final class Module implements Serializable {
         if (ent == null) {
             // Do not overwrite old definition.
             map.put(name, value);
-        } else if (!value.source.equals(ent.source)) {
+        } else if (value.source != null && !value.source.equals(ent.source)) {
             // Check if the two symbols are from the same place.
             // If they are not, crash due to ambiguity
             throw new DuplicateSymbolException(name);
@@ -101,22 +111,6 @@ public final class Module implements Serializable {
 
     public Entry get(String name) {
         return map.get(name);
-    }
-
-    public void putType(String name, Entry value) {
-        final Module.Entry ent = getType(name);
-        if (ent == null) {
-            // Do not overwrite old definition.
-            type.put(name, value);
-        } else if (!value.source.equals(ent.source)) {
-            // Check if the two symbols are from the same place.
-            // If they are not, crash due to ambiguity
-            throw new DuplicateSymbolException(name);
-        }
-    }
-
-    public Entry getType(String name) {
-        return type.get(name);
     }
 
     public static String makeFuncName(final String name, final String... params) {

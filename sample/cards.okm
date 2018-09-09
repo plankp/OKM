@@ -1,0 +1,6 @@
+# SPADES = 0, ..., CLUBS = 3
+# They have type Suit but has conversion to int
+# Ints cannot convert to Suit, however
+public enum Suit (
+    SPADES, HEARTS, DIAMONDS, CLUBS
+)

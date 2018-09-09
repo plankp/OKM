@@ -195,6 +195,18 @@ public class Machine {
                     case LOAD_NUMERAL:  // LOAD_NUMERAL     dst:result, lhs:value
                         locals.put(stmt.dst, stmt.lhs);
                         break;
+                    case LOAD_ENUM:     // LOAD_ENUM        dst:store, lhs:enum keys
+                        locals.put(stmt.dst, stmt.lhs);
+                        break;
+                    case LOAD_ENUM_KEY: { //                dst:store, lhs:enum, rhs:enum key
+                        final String key = fetchValue(stmt.rhs).toString();
+                        final int keyIndex = ((EnumKeys) fetchValue(stmt.lhs)).getIndexOfKey(key);
+                        if (keyIndex < 0) {
+                            throw new RuntimeException("Enum does not contain key " + key);
+                        }
+                        locals.put(stmt.dst, new Fixnum(keyIndex, Integer.SIZE));
+                        break;
+                    }
                     case STORE_VAR:     // STORE_VAR        dst:store, lhs:value
                         locals.put(stmt.dst, fetchValue(stmt.lhs));
                         break;
