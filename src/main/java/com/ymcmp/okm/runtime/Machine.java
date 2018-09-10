@@ -207,8 +207,20 @@ public class Machine {
                         locals.put(stmt.dst, new Fixnum(keyIndex, Integer.SIZE));
                         break;
                     }
+                    case LOAD_STRUCT:   // LOAD_STRUCT      dst:store, lhs:structfield
+                        locals.put(stmt.dst, fetchValue(stmt.lhs));
+                        break;
                     case STORE_VAR:     // STORE_VAR        dst:store, lhs:value
                         locals.put(stmt.dst, fetchValue(stmt.lhs));
+                        break;
+                    case ALLOC_STRUCT:  // ALLOC_STRUCT     dst:store, lhs:reference to structfield
+                        locals.put(stmt.dst, ((StructFields) fetchValue(stmt.lhs)).duplicate());
+                        break;
+                    case GET_ATTR:      // GET_ATTR         dst:store, lhs:struct, rhs:attr
+                        locals.put(stmt.dst, ((StructFields) fetchValue(stmt.lhs)).get(stmt.rhs.toString()));
+                        break;
+                    case PUT_ATTR:      // PUT_ATTR         dst:value, lhs:struct, rhs:attr
+                        ((StructFields) fetchValue(stmt.lhs)).put(stmt.rhs.toString(), fetchValue(stmt.dst));
                         break;
                     case RETURN_UNIT:   // RETURN_UNIT
                         return null;

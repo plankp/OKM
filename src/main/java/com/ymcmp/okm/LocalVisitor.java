@@ -516,8 +516,10 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
         if (ctx.list != null) {
             visit(ctx.list);
         }
-        currentModule.put(name, Module.Entry.newType(currentVisibility, type, currentFile));
         LOGGER.info("Declare " + currentVisibility + " " + type);
+        final Module.Entry entry = Module.Entry.newType(currentVisibility, type, currentFile);
+        currentModule.put(name, entry);
+        PRE_INIT_STMTS.add(new Statement(Operation.LOAD_STRUCT, new StructFields(), Register.makeNamed(NAMING_STRAT.name(entry, name))));
         this.currentStruct = null;
         return null;
     }
@@ -747,12 +749,9 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
     }
 
     private Type processAssign(final ParseTree dest, final ParseTree tail) {
-        System.out.println("    DEST: " + dest.getText());
-        System.out.println("    TAIL: " + tail.getText());
-
         final Type declType = (Type) visit(dest);
         final Value dummyValue = VALUE_STACK.pop();
-        final Statement lastInstr = funcStmts.get(funcStmts.size() - 1);
+        final Statement lastInstr = funcStmts.isEmpty() ? null : funcStmts.get(funcStmts.size() - 1);
 
         final Type valueType = (Type) visit(tail);
         if (!valueType.canConvertTo(declType)) {
@@ -765,7 +764,7 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
             funcStmts.add(new Statement(Operation.STORE_VAR, VALUE_STACK.pop(), dummyValue));
             // Keep the register on the stack
             VALUE_STACK.push(dummyValue);
-        } else if (lastInstr.op == Operation.GET_ATTR) {
+        } else if (lastInstr != null && lastInstr.op == Operation.GET_ATTR) {
             // R1 <- GET_ATTR R0, attr  ; new PUT_ATTR is the same (R1 is used as new value)
             validMove = true;
             funcStmts.add(new Statement(Operation.PUT_ATTR, lastInstr.lhs, lastInstr.rhs, VALUE_STACK.peek()));

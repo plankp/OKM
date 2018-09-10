@@ -15,11 +15,13 @@ public struct Card (
     value :FaceValue
 )
 
-unit cards () {
-    # This code does not emulate since ALLOC_STRUCT
-    # is not implemented yet
-    ace_of_spades := new Card
+Card new_card (suit :Suit, value :FaceValue) {
+    card := new Card
+    card.suit = suit
+    card.value = value
+    return card
+}
 
-    ace_of_spades.suit  = Suit.SPADES
-    ace_of_spades.value = FaceValue.ACE
+unit cards () {
+    ace_of_spades := new_card(suit: Suit.SPADES, value: FaceValue.ACE)
 }
