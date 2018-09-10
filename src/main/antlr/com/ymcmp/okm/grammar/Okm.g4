@@ -24,8 +24,10 @@ UNIT: 'unit';
 BOOL: 'bool';
 
 ENUM: 'enum';
+STRUCT: 'struct';
 
 RETURN: 'return';
+NEW: 'new';
 
 TRUE: 'true';
 FALSE: 'false';
@@ -71,6 +73,7 @@ decls:
         | functionDecl
         | variableDecl
         | enumDecl
+        | structDecl
     );
 
 symbolName:
@@ -117,6 +120,10 @@ functionDecl:
 
 variableDecl: p = parameter;
 
+structList: (variableDecl COMMA)* variableDecl;
+structDecl:
+    STRUCT name = IDENT LPAREN list = structList? RPAREN;
+
 enumList: (IDENT COMMA)* IDENT;
 enumDecl: ENUM name = IDENT LPAREN list = enumList? RPAREN;
 
@@ -139,6 +146,7 @@ rcallStmt: base = expr tail = rcallTail;
 expr:
     NUMBER                                             # exprNumber
     | (TRUE | FALSE)                                   # exprBool
+    | NEW t = IDENT                                    # exprAllocStruct
     | base = expr tail = rcallTail                     # exprRefCall
     | fcallStmt                                        # exprFuncCall
     | symbolName                                       # exprSymbol

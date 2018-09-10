@@ -111,6 +111,8 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
     private Type conformingType;
     private List<Statement> funcStmts;
 
+    private StructType currentStruct;
+
     private List<Tuple<Scope, FunctionDeclContext>> pendingFunctions;
 
     public Map<String, List<Statement>> compile(final Path p) {
@@ -472,6 +474,10 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
                 // This is a local variable
                 LOGGER.info("Declare local variable " + newVar.getA() + " as type " + newVar.getB());
                 currentScope.put(newVar.getA(), newVar.getB());
+            } else if (currentStruct != null) {
+                // This is part of a struct
+                LOGGER.info("Declare " + currentStruct + " field " + newVar.getA() + " as type " + newVar.getB());
+                currentStruct.putField(newVar.getA(), newVar.getB());
             } else {
                 // This is a module level variable
                 LOGGER.info("Declare " + currentVisibility + " variable " + newVar.getA() + " as type " + newVar.getB());
@@ -499,6 +505,20 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
         final Module.Entry entry = Module.Entry.newType(currentVisibility, type, currentFile);
         currentModule.put(name, entry);
         PRE_INIT_STMTS.add(new Statement(Operation.LOAD_ENUM, new EnumKeys(keys), Register.makeNamed(NAMING_STRAT.name(entry, name))));
+        return null;
+    }
+
+    @Override
+    public Object visitStructDecl(StructDeclContext ctx) {
+        final String name = ctx.name.getText();
+        final StructType type = new StructType(name);
+        this.currentStruct = type;
+        if (ctx.list != null) {
+            visit(ctx.list);
+        }
+        currentModule.put(name, Module.Entry.newType(currentVisibility, type, currentFile));
+        LOGGER.info("Declare " + currentVisibility + " " + type);
+        this.currentStruct = null;
         return null;
     }
 
@@ -1053,6 +1073,26 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
 
         LOGGER.info("Literal " + text + " is a " + typeName);
         return UnaryType.getType(typeName);
+    }
+
+    @Override
+    public Type visitExprAllocStruct(ExprAllocStructContext ctx) {
+        final String structName = ctx.t.getText();
+        final Module.Entry ent = currentModule.get(structName);
+        if (ent == null) {
+            throw new UndefinedSymbolException(structName);
+        }
+        if (ent.isType && ent.type instanceof StructType) {
+            final StructType newData = ((StructType) ent.type).allocate();
+            final Register temp = Register.makeTemporary();
+            funcStmts.add(new Statement(
+                    Operation.ALLOC_STRUCT,
+                    Register.makeNamed(currentScope.getProcessedName(NAMING_STRAT, structName)),
+                    temp));
+            VALUE_STACK.push(temp);
+            return newData;
+        }
+        throw new UndefinedOperationException("Cannot allocate non-struct type " + structName);
     }
 
     @Override

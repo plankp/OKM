@@ -78,6 +78,8 @@ public enum Operation {
 
     STORE_VAR,
 
+    ALLOC_STRUCT,
+
     ACCESS_ATTR,
 
     RETURN_UNIT,

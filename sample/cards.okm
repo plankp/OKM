@@ -4,3 +4,18 @@
 public enum Suit (
     SPADES, HEARTS, DIAMONDS, CLUBS
 )
+
+public enum FaceValue (
+    ACE, TWO, THREE, FOUR, FIVE, SIX, SEVEN, EIGHT, NINE, TEN,
+    JACK, QUEEN, KING
+)
+
+public struct Card (
+    suit :Suit,
+    value :FaceValue
+)
+
+unit cards () {
+    ace_of_spades := new Card
+    # ace_of_spades = Suit.SPADES
+}
