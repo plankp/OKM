@@ -545,24 +545,20 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
     }
 
     @Override
-    public Type visitAssignStmt(AssignStmtContext ctx) {
-        final String name = ctx.name.getText();
-        final Type declType = currentScope.get(name);
-        if (declType == null) {
-            throw new UndefinedSymbolException(name);
+    public Object visitAssignStmt(AssignStmtContext ctx) {
+        // Unfortunately for an expression a = b = c = 10
+        // the tree is built like ((a = b) = c) = 10
+        ParseTree lhs = ctx.dest;
+        ParseTree rhs = ctx.value;
+
+        while (lhs instanceof ExprAssignContext) {
+            final ParseTree ref = lhs.getChild(2);
+            processAssign(ref, rhs);
+            lhs = lhs.getChild(0);
+            rhs = ref;
         }
-
-        final Type valueType = (Type) visit(ctx.value);
-        if (!valueType.canConvertTo(declType)) {
-            throw new IncompatibleTypeException(valueType, declType);
-        }
-
-        final Register dest = Register.makeNamed(currentScope.getProcessedName(NAMING_STRAT, name));
-        funcStmts.add(new Statement(Operation.STORE_VAR, VALUE_STACK.pop(), dest));
-        VALUE_STACK.push(dest);
-
-        LOGGER.info("Assign type " + valueType + " to " + name + " :" + declType);
-        return valueType;
+        processAssign(lhs, rhs);
+        return null;
     }
 
     @Override
@@ -748,6 +744,43 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
         } else {
             throw new IncompatibleTypeException(a, b);
         }
+    }
+
+    private Type processAssign(final ParseTree dest, final ParseTree tail) {
+        System.out.println("    DEST: " + dest.getText());
+        System.out.println("    TAIL: " + tail.getText());
+
+        final Type declType = (Type) visit(dest);
+        final Value dummyValue = VALUE_STACK.pop();
+        final Statement lastInstr = funcStmts.get(funcStmts.size() - 1);
+
+        final Type valueType = (Type) visit(tail);
+        if (!valueType.canConvertTo(declType)) {
+            throw new IncompatibleTypeException(valueType, declType);
+        }
+
+        boolean validMove = false;
+        if (dummyValue instanceof Register && !dummyValue.isTemporary()) {
+            validMove = true;
+            funcStmts.add(new Statement(Operation.STORE_VAR, VALUE_STACK.pop(), dummyValue));
+            // Keep the register on the stack
+            VALUE_STACK.push(dummyValue);
+        } else if (lastInstr.op == Operation.GET_ATTR) {
+            // R1 <- GET_ATTR R0, attr  ; new PUT_ATTR is the same (R1 is used as new value)
+            validMove = true;
+            funcStmts.add(new Statement(Operation.PUT_ATTR, lastInstr.lhs, lastInstr.rhs, VALUE_STACK.peek()));
+        }
+
+        if (!validMove) {
+            throw new UndefinedOperationException("Bad storage pointer of " + dest.getText());
+        }
+        LOGGER.info("Assign type " + valueType + " to storage of type " + declType);
+        return valueType;
+    }
+
+    @Override
+    public Type visitExprAssign(ExprAssignContext ctx) {
+        return processAssign(ctx.dest, ctx.value);
     }
 
     @Override
@@ -953,7 +986,7 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
 
         LOGGER.info(base + "." + attr + " yields " + result);
         funcStmts.add(new Statement(
-                base instanceof EnumType ? Operation.LOAD_ENUM_KEY : Operation.ACCESS_ATTR,
+                base instanceof EnumType ? Operation.LOAD_ENUM_KEY : Operation.GET_ATTR,
                 VALUE_STACK.pop(),
                 Register.makeNamed(attr), temporary));
         VALUE_STACK.push(temporary);

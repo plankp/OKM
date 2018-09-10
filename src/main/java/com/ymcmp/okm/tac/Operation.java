@@ -80,7 +80,8 @@ public enum Operation {
 
     ALLOC_STRUCT,
 
-    ACCESS_ATTR,
+    GET_ATTR,
+    PUT_ATTR,
 
     RETURN_UNIT,
     RETURN_VALUE,
@@ -100,6 +101,7 @@ public enum Operation {
     public boolean readsFromDst() {
         switch (this) {
             case PUSH_PARAM:
+            case PUT_ATTR:
             case RETURN_VALUE:
                 return true;
             default:
@@ -141,6 +143,7 @@ public enum Operation {
             case STORE_VAR:
             case PUSH_PARAM:
             case POP_PARAM:
+            case PUT_ATTR:
             case CALL:
             case TAILCALL:
                 return true;

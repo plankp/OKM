@@ -16,6 +16,10 @@ public struct Card (
 )
 
 unit cards () {
+    # This code does not emulate since ALLOC_STRUCT
+    # is not implemented yet
     ace_of_spades := new Card
-    # ace_of_spades = Suit.SPADES
+
+    ace_of_spades.suit  = Suit.SPADES
+    ace_of_spades.value = FaceValue.ACE
 }

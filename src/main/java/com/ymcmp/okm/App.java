@@ -13,7 +13,8 @@ public class App {
 
     public static void main(String[] args) {
         final Map<String, List<Statement>> result = new LocalVisitor()
-                .compile(Paths.get("./sample/demo.okm"));
+                // .compile(Paths.get("./sample/demo.okm"));
+                .compile(Paths.get("./sample/cards.okm"));
         result.forEach((k, v) -> {
             System.out.println("Function " + k);
             for (int i = 0; i < v.size(); ++i) {
