@@ -1,51 +1,18 @@
 package com.ymcmp.okm.tac;
 
-import java.io.Serializable;
+public interface Mutable extends Value {
 
-public final class Mutable<T extends Value> implements Serializable, Value {
+    public Value getValue();
 
-    private static final long serialVersionUID = 1092347246356L;
+    public void setValue(Value value);
 
-    private T mutable;
-
-    public T getValue() {
-        return mutable;
-    }
-
-    public void setValue(T value) {
-        mutable = value;
+    @Override
+    public default boolean isNumeric() {
+        return getValue().isNumeric();
     }
 
     @Override
-    public Mutable<T> duplicate() {
-        // Note: the object it points to is not duplicated!
-        final Mutable<T> t = new Mutable<>();
-        t.setValue(mutable);
-        return t;
-    }
-
-    @Override
-    public boolean isNumeric() {
-        return mutable.isNumeric();
-    }
-
-    @Override
-    public boolean isTemporary() {
-        return mutable.isTemporary();
-    }
-
-    @Override
-    public String toString() {
-        return mutable.toString();
-    }
-
-    @Override
-    public int hashCode() {
-        return mutable.hashCode();
-    }
-
-    @Override
-    public boolean equals(final Object obj) {
-        return mutable == null && obj == null || mutable.equals(obj);
+    public default boolean isTemporary() {
+        return getValue().isTemporary();
     }
 }

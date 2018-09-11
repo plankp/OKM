@@ -4,7 +4,7 @@ A programming language that has a builtin crappy optimizer!
 
 Apart from that, it has modules which are like static classes.
 
-Currently, it lacks a lot of usual stuff such as strings, arrays / pointers, classes / closures.
+Currently, it lacks a lot of usual stuff such as strings, arrays, classes / closures.
 
 There are structs though, and I plan to make them kind of like classes as well!
 

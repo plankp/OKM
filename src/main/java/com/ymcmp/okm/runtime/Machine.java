@@ -22,7 +22,7 @@ public class Machine {
     }
 
     private Value execute(final Map<String, List<Statement>> code, final String funcName) {
-        final Mutable<Value> mut = new Mutable<>();
+        final Mutable mut = new MutableCell();
         if (tryCallSpecialFunctions(funcName, mut)) {
             return mut.getValue();
         }
@@ -33,7 +33,7 @@ public class Machine {
         }
     }
 
-    private boolean tryCallSpecialFunctions(final String funcName, final Mutable<Value> mut) {
+    private boolean tryCallSpecialFunctions(final String funcName, final Mutable mut) {
         try {
             if (funcName.startsWith("@M")) {
                 switch (funcName.substring(4)) {
@@ -215,6 +215,31 @@ public class Machine {
                     case STORE_VAR:     // STORE_VAR        dst:store, lhs:value
                         locals.put(stmt.dst, fetchValue(stmt.lhs).duplicate());
                         break;
+                    case REFER_VAR:     // REFER_VAR        dst:store, lhs:register
+                        locals.put(stmt.dst, new MutableCell(fetchValue(stmt.lhs)));
+                        break;
+                    case REFER_ATTR: {  // REFER_ATTR       dst:store, lhs:struct, rhs:attr
+                        final StructFields struct = (StructFields) fetchValue(stmt.lhs);
+                        final String attr = stmt.rhs.toString();
+                        locals.put(stmt.dst, new Mutable() {
+
+                            @Override
+                            public Value duplicate() {
+                                return this;
+                            }
+
+                            @Override
+                            public Value getValue() {
+                                return struct.get(attr);
+                            }
+
+                            @Override
+                            public void setValue(Value value) {
+                                struct.put(attr, value);
+                            }
+                        });
+                        break;
+                    }
                     case ALLOC_STRUCT:  // ALLOC_STRUCT     dst:store, lhs:reference to structfield
                         locals.put(stmt.dst, ((StructFields) fetchValue(stmt.lhs)).duplicate());
                         break;
@@ -246,7 +271,7 @@ public class Machine {
                         break;
                     case PUSH_PARAM:    // PUSH_PARAM       dst:value
                         // Pass by value, (including structs)
-                        callStack.push(fetchValue(stmt.dst).duplicate());
+                        callStack.push(fetchValue(stmt.dst, false).duplicate());
                         break;
                     case CALL:          // CALL             dst:store, lhs:callsite
                         locals.put(stmt.dst, execute(code, fetchValue(stmt.lhs).toString()));
@@ -255,7 +280,7 @@ public class Machine {
                         // Update parameter $list, reset counter $i and restart
                         // unless it is one of the special functions
                         final String funcName = stmt.dst.toString();
-                        final Mutable<Value> mut = new Mutable<>();
+                        final Mutable mut = new MutableCell();
                         if (tryCallSpecialFunctions(funcName, mut)) {
                             return mut.getValue();
                         }
@@ -276,7 +301,15 @@ public class Machine {
     }
 
     private Value fetchValue(final Value val) {
-        return locals.getOrDefault(val, val);
+        return fetchValue(val, true);
+    }
+
+    private Value fetchValue(final Value val, final boolean resolveRef) {
+        final Value v = locals.getOrDefault(val, val);
+        if (resolveRef && v instanceof Mutable) {
+            return ((Mutable) v).getValue();
+        }
+        return v;
     }
 
     private static Fixnum makeBool(final boolean b) {

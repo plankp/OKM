@@ -639,7 +639,7 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
         // Function pointer must go before its arguments
         // but since function name is not resolved until
         // later, we use hacks...
-        final Mutable<Register> mut = new Mutable<>();
+        final Mutable mut = new MutableCell();
         VALUE_STACK.push(mut);
 
         final List<Tuple<String, Type>> args = ctx.exprs == null ? Collections.EMPTY_LIST : visitFArgsList(ctx.exprs);
@@ -794,6 +794,30 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
             throw new UndefinedOperationException("Bad storage pointer of " + dest.getText());
         }
         LOGGER.info("Assign type " + valueType + " to storage of type " + declType);
+        return valueType;
+    }
+
+    private Type processMakeRef(final ParseTree value) {
+        final Type valueType = (Type) visit(value);
+        final Value dummyValue = VALUE_STACK.pop();
+        final Statement lastInstr = funcStmts.isEmpty() ? null : funcStmts.get(funcStmts.size() - 1);
+
+        boolean validMove = false;
+        final Register temporary = Register.makeTemporary();
+        if (dummyValue instanceof Register && !dummyValue.isTemporary()) {
+            validMove = true;
+            funcStmts.add(new Statement(Operation.REFER_VAR, dummyValue, temporary));
+        } else if (lastInstr != null && lastInstr.op == Operation.GET_ATTR) {
+            // R1 <- GET_ATTR R0, attr  ; new PUT_ATTR is the same (R1 is used as new value)
+            validMove = true;
+            funcStmts.add(new Statement(Operation.REFER_ATTR, lastInstr.lhs, lastInstr.rhs, temporary));
+        }
+
+        if (!validMove) {
+            throw new UndefinedOperationException("Bad storage pointer of " + value.getText());
+        }
+        VALUE_STACK.push(temporary);
+        LOGGER.info("Create reference to type " + valueType);
         return valueType;
     }
 
@@ -1015,6 +1039,10 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
     @Override
     public Type visitExprUnary(ExprUnaryContext ctx) {
         final String name = ctx.op.getText();
+        if (name.equals("&")) {
+            return processMakeRef(ctx.rhs);
+        }
+
         final Tuple<Operation, UnaryOperator> tuple = UNI_OP_MAPPING.get(name);
         final UnaryOperator op = tuple.getB();
         if (op == null) {

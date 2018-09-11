@@ -79,6 +79,9 @@ public enum Operation {
 
     STORE_VAR,
 
+    REFER_VAR,
+    REFER_ATTR,
+
     ALLOC_STRUCT,
 
     GET_ATTR,
@@ -142,6 +145,8 @@ public enum Operation {
             case BINARY_EQUALS:
             case BINARY_NOT_EQUALS:
             case STORE_VAR:
+            case REFER_VAR:
+            case REFER_ATTR:
             case PUSH_PARAM:
             case POP_PARAM:
             case PUT_ATTR:
