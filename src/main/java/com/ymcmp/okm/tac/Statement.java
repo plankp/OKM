@@ -34,7 +34,7 @@ public final class Statement implements Serializable {
     public String toString() {
         return dst == null ? op.toString()
              : lhs == null ? op + " " + dst
-             : rhs == null ? dst + " <- " + op + " " + lhs
-             : dst + " <- " + op + " " + lhs + ", " + rhs;
+             : rhs == null ? op + " " + dst + ", " + lhs
+             : op + " " + dst + ", " + lhs + ", " + rhs;
     }
 }
