@@ -71,24 +71,6 @@ public class Machine {
                     case NOP:           // NOP              <ignore>
                         // NOP does nothing..
                         break;
-                    case BINARY_LESSER_THAN: //             dst:result, lhs:a, rhs:b
-                        locals.put(stmt.dst, makeBool(((Comparable) fetchValue(stmt.lhs)).compareTo(fetchValue(stmt.rhs)) < 0));
-                        break;
-                    case BINARY_GREATER_THAN: //            dst:result, lhs:a, rhs:b
-                        locals.put(stmt.dst, makeBool(((Comparable) fetchValue(stmt.lhs)).compareTo(fetchValue(stmt.rhs)) > 0));
-                        break;
-                    case BINARY_LESSER_EQUALS: //           dst:result, lhs:a, rhs:b
-                        locals.put(stmt.dst, makeBool(((Comparable) fetchValue(stmt.lhs)).compareTo(fetchValue(stmt.rhs)) <= 0));
-                        break;
-                    case BINARY_GREATER_EQUALS: //          dst:result, lhs:a, rhs:b
-                        locals.put(stmt.dst, makeBool(((Comparable) fetchValue(stmt.lhs)).compareTo(fetchValue(stmt.rhs)) >= 0));
-                        break;
-                    case BINARY_EQUALS: //                  dst:result, lhs:a, rhs:b
-                        locals.put(stmt.dst, makeBool(fetchValue(stmt.lhs).equals(fetchValue(stmt.rhs))));
-                        break;
-                    case BINARY_NOT_EQUALS: //              dst:result, lhs:a, rhs:b
-                        locals.put(stmt.dst, makeBool(!fetchValue(stmt.lhs).equals(fetchValue(stmt.rhs))));
-                        break;
                     case CONV_BYTE_INT: // CONV_BYTE_INT    dst:result, lhs:base
                     case CONV_SHORT_INT:// CONV_SHORT_INT   dst:result, lhs:base
                         locals.put(stmt.dst, new Fixnum(toInt(fetchValue(stmt.lhs)), Integer.SIZE));
@@ -109,6 +91,24 @@ public class Machine {
                     case CONV_LONG_DOUBLE: //               dst:result, lhs:base
                     case CONV_FLOAT_DOUBLE: //              dst:result, lhs:base
                         locals.put(stmt.dst, new Fixnum(toDouble(fetchValue(stmt.lhs))));
+                        break;
+                    case INT_LT:        // INT_LT           dst:result, lhs:a, rhs:b
+                        locals.put(stmt.dst, makeBool(toInt(fetchValue(stmt.lhs)) < toInt(fetchValue(stmt.rhs))));
+                        break;
+                    case INT_GT:        // INT_GT           dst:result, lhs:a, rhs:b
+                        locals.put(stmt.dst, makeBool(toInt(fetchValue(stmt.lhs)) > toInt(fetchValue(stmt.rhs))));
+                        break;
+                    case INT_LE:        // INT_LE           dst:result, lhs:a, rhs:b
+                        locals.put(stmt.dst, makeBool(toInt(fetchValue(stmt.lhs)) <= toInt(fetchValue(stmt.rhs))));
+                        break;
+                    case INT_GE:        // INT_GE           dst:result, lhs:a, rhs:b
+                        locals.put(stmt.dst, makeBool(toInt(fetchValue(stmt.lhs)) >= toInt(fetchValue(stmt.rhs))));
+                        break;
+                    case INT_EQ:        // INT_EQ           dst:result, lhs:a, rhs:b
+                        locals.put(stmt.dst, makeBool(toInt(fetchValue(stmt.lhs)) == toInt(fetchValue(stmt.rhs))));
+                        break;
+                    case INT_NE:        // INT_NE           dst:result, lhs:a, rhs:b
+                        locals.put(stmt.dst, makeBool(toInt(fetchValue(stmt.lhs)) != toInt(fetchValue(stmt.rhs))));
                         break;
                     case INT_NEG:       // INT_NEG          dst:result, lhs:base
                         locals.put(stmt.dst, new Fixnum(-toInt(fetchValue(stmt.lhs)), Integer.SIZE));
@@ -131,6 +131,9 @@ public class Machine {
                     case INT_MOD:       // INT_MOD          dst:result, lhs:a, rhs:b
                         locals.put(stmt.dst, new Fixnum(toInt(fetchValue(stmt.lhs)) % toInt(fetchValue(stmt.rhs)), Integer.SIZE));
                         break;
+                    case LONG_CMP:      // LONG_CMP         dst:result, lhs:a, rhs:b
+                        locals.put(stmt.dst, new Fixnum(Long.compare(toLong(fetchValue(stmt.lhs)), toLong(fetchValue(stmt.rhs))), Integer.SIZE));
+                        break;
                     case LONG_NEG:      // LONG_NEG         dst:result, lhs:base
                         locals.put(stmt.dst, new Fixnum(-toLong(fetchValue(stmt.lhs))));
                         break;
@@ -152,6 +155,9 @@ public class Machine {
                     case LONG_MOD:      // LONG_MOD         dst:result, lhs:a, rhs:b
                         locals.put(stmt.dst, new Fixnum(toLong(fetchValue(stmt.lhs)) % toLong(fetchValue(stmt.rhs))));
                         break;
+                    case FLOAT_CMP:     // FLOAT_CMP        dst:result, lhs:a, rhs:b
+                        locals.put(stmt.dst, new Fixnum(Float.compare(toFloat(fetchValue(stmt.lhs)), toFloat(fetchValue(stmt.rhs))), Integer.SIZE));
+                        break;
                     case FLOAT_NEG:     // FLOAT_NEG        dst:result, lhs:base
                         locals.put(stmt.dst, new Fixnum(-toFloat(fetchValue(stmt.lhs)), Float.SIZE));
                         break;
@@ -169,6 +175,9 @@ public class Machine {
                         break;
                     case FLOAT_MOD:     // FLOAT_MOD        dst:result, lhs:a, rhs:b
                         locals.put(stmt.dst, new Fixnum(toFloat(fetchValue(stmt.lhs)) % toFloat(fetchValue(stmt.rhs)), Float.SIZE));
+                        break;
+                    case DOUBLE_CMP:    // DOUBLE_CMP       dst:result, lhs:a, rhs:b
+                        locals.put(stmt.dst, new Fixnum(Double.compare(toDouble(fetchValue(stmt.lhs)), toDouble(fetchValue(stmt.rhs))), Integer.SIZE));
                         break;
                     case DOUBLE_NEG:    // DOUBLE_NEG       dst:result, lhs:base
                         locals.put(stmt.dst, new Fixnum(-toDouble(fetchValue(stmt.lhs))));

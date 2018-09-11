@@ -51,6 +51,8 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
     private static final UnaryType TYPE_FLOAT = UnaryType.getType("float");
     private static final UnaryType TYPE_DOUBLE = UnaryType.getType("double");
 
+    private static final Fixnum INT_ZERO = new Fixnum(0, Integer.SIZE);
+
     static {
         UNI_OP_MAPPING.put("+", UnaryOperator.ADD);
         UNI_OP_MAPPING.put("-", UnaryOperator.SUB);
@@ -137,7 +139,7 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
         for (final String func : MODULE_INITS) {
             initializer.add(new Statement(Operation.CALL, Register.makeNamed(func), Register.makeTemporary()));
         }
-        // Use RETURN_UNIT 
+        // Use RETURN_UNIT
         initializer.add(new Statement(Operation.RETURN_UNIT));
         RESULT.put("@init", initializer);
 
@@ -860,7 +862,7 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
         if (TYPE_SHORT.isSameType(t)) {
             return new Operation[] { Operation.CONV_SHORT_INT, Operation.CONV_INT_LONG };
         }
-        if (TYPE_INT.isSameType(t)) {
+        if (TYPE_INT.isSameType(t) || t instanceof EnumKeyType) {
             return new Operation[] { Operation.CONV_INT_LONG };
         }
         if (TYPE_LONG.isSameType(t)) {
@@ -959,16 +961,25 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
             a = applyRegisterTransfer(a, aSeq);
             b = applyRegisterTransfer(b, bSeq);
 
+            boolean generateCleanup = false;
             switch (op) {
-                case ADD: opcode = useLong ? Operation.LONG_ADD : Operation.INT_ADD; break;
-                case SUB: opcode = useLong ? Operation.LONG_SUB : Operation.INT_SUB; break;
-                case MUL: opcode = useLong ? Operation.LONG_MUL : Operation.INT_MUL; break;
-                case DIV: opcode = useLong ? Operation.LONG_DIV : Operation.INT_DIV; break;
-                case MOD: opcode = useLong ? Operation.LONG_MOD : Operation.INT_MOD; break;
+                case ADD: opcode = useLong ? Operation.LONG_ADD : Operation.INT_ADD; generateCleanup = true; break;
+                case SUB: opcode = useLong ? Operation.LONG_SUB : Operation.INT_SUB; generateCleanup = true; break;
+                case MUL: opcode = useLong ? Operation.LONG_MUL : Operation.INT_MUL; generateCleanup = true; break;
+                case DIV: opcode = useLong ? Operation.LONG_DIV : Operation.INT_DIV; generateCleanup = true; break;
+                case MOD: opcode = useLong ? Operation.LONG_MOD : Operation.INT_MOD; generateCleanup = true; break;
+                case LESSER_THAN:    opcode = useLong ? Operation.LONG_CMP : Operation.INT_LT; break;
+                case GREATER_THAN:   opcode = useLong ? Operation.LONG_CMP : Operation.INT_GT; break;
+                case LESSER_EQUALS:  opcode = useLong ? Operation.LONG_CMP : Operation.INT_LE; break;
+                case GREATER_EQUALS: opcode = useLong ? Operation.LONG_CMP : Operation.INT_GE; break;
+                case EQUALS:         opcode = useLong ? Operation.LONG_CMP : Operation.INT_EQ; break;
+                case NOT_EQUALS:     opcode = useLong ? Operation.LONG_CMP : Operation.INT_NE; break;
             }
 
-            // Downcast back to actual type is necessary
-            cleanupSeq = uncastLongSequence(useLong, result);
+            if (generateCleanup) {
+                // Downcast back to actual type is necessary
+                cleanupSeq = uncastLongSequence(useLong, result);
+            }
         } else if ((aSeq = convertSeqToFloat(rhs)) != null
                 && (bSeq = convertSeqToFloat(lhs)) != null) {
             a = applyRegisterTransfer(a, aSeq);
@@ -980,6 +991,14 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
                 case MUL: opcode = Operation.FLOAT_MUL; break;
                 case DIV: opcode = Operation.FLOAT_DIV; break;
                 case MOD: opcode = Operation.FLOAT_MOD; break;
+                case LESSER_THAN:
+                case GREATER_THAN:
+                case LESSER_EQUALS:
+                case GREATER_EQUALS:
+                case EQUALS:
+                case NOT_EQUALS:
+                    opcode = Operation.FLOAT_CMP;
+                    break;
             }
         } else if ((aSeq = convertSeqToDouble(rhs)) != null
                 && (bSeq = convertSeqToDouble(lhs)) != null) {
@@ -992,24 +1011,51 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
                 case MUL: opcode = Operation.DOUBLE_MUL; break;
                 case DIV: opcode = Operation.DOUBLE_DIV; break;
                 case MOD: opcode = Operation.DOUBLE_MOD; break;
+                case LESSER_THAN:
+                case GREATER_THAN:
+                case LESSER_EQUALS:
+                case GREATER_EQUALS:
+                case EQUALS:
+                case NOT_EQUALS:
+                    opcode = Operation.DOUBLE_CMP;
+                    break;
             }
         }
 
         if (opcode == null) {
-            // TODO: Remove this switch block!
-            switch (op) {
-                case LESSER_THAN:    opcode = Operation.BINARY_LESSER_THAN; break;
-                case GREATER_THAN:   opcode = Operation.BINARY_GREATER_THAN; break;
-                case LESSER_EQUALS:  opcode = Operation.BINARY_LESSER_EQUALS; break;
-                case GREATER_EQUALS: opcode = Operation.BINARY_GREATER_EQUALS; break;
-                case EQUALS:         opcode = Operation.BINARY_EQUALS; break;
-                case NOT_EQUALS:     opcode = Operation.BINARY_NOT_EQUALS; break;
-                default:
-                    throw new AssertionError("Compiler failed to synthesize " + op + " for " + lhs + " and " + rhs);
-            }
+            throw new AssertionError("Compiler failed to synthesize " + op + " for " + lhs + " and " + rhs);
         }
 
-        funcStmts.add(new Statement(opcode, b, a, temporary));
+        if (opcode.isCmp()) {
+            // These opcodes return an integer instead of a boolean
+            // an additional INT_* comparison is needed
+            final Register cmpValue = Register.makeTemporary();
+            funcStmts.add(new Statement(opcode, b, a, cmpValue));
+            switch (op) {
+                case LESSER_THAN:       // cmpValue < 0
+                    funcStmts.add(new Statement(Operation.INT_LT, cmpValue, INT_ZERO, temporary));
+                    break;
+                case GREATER_THAN:
+                    funcStmts.add(new Statement(Operation.INT_GT, cmpValue, INT_ZERO, temporary));
+                    break;
+                case LESSER_EQUALS:
+                    funcStmts.add(new Statement(Operation.INT_LE, cmpValue, INT_ZERO, temporary));
+                    break;
+                case GREATER_EQUALS:
+                    funcStmts.add(new Statement(Operation.INT_GE, cmpValue, INT_ZERO, temporary));
+                    break;
+                case EQUALS:
+                    funcStmts.add(new Statement(Operation.INT_EQ, cmpValue, INT_ZERO, temporary));
+                    break;
+                case NOT_EQUALS:
+                    funcStmts.add(new Statement(Operation.INT_NE, cmpValue, INT_ZERO, temporary));
+                    break;
+                default:
+                    throw new AssertionError("Unknown additional comparison " + op);
+            }
+        } else {
+            funcStmts.add(new Statement(opcode, b, a, temporary));
+        }
         VALUE_STACK.push(applyRegisterTransfer(temporary, cleanupSeq));
 
         LOGGER.info(lhs + " " + name + " " + rhs + " yields " + result);
@@ -1097,6 +1143,7 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
         if (opcode == null) {
             throw new AssertionError("Compiler failed to synthesize " + op + " for " + base);
         }
+
         funcStmts.add(new Statement(opcode, value, temporary));
         VALUE_STACK.push(applyRegisterTransfer(temporary, cleanupSeq));
 
