@@ -213,7 +213,7 @@ public class Machine {
                         locals.put(stmt.dst, fetchValue(stmt.lhs));
                         break;
                     case STORE_VAR:     // STORE_VAR        dst:store, lhs:value
-                        locals.put(stmt.dst, fetchValue(stmt.lhs));
+                        locals.put(stmt.dst, fetchValue(stmt.lhs).duplicate());
                         break;
                     case ALLOC_STRUCT:  // ALLOC_STRUCT     dst:store, lhs:reference to structfield
                         locals.put(stmt.dst, ((StructFields) fetchValue(stmt.lhs)).duplicate());

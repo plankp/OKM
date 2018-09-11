@@ -32,5 +32,11 @@ unit mutate (card :Card) {
 
 unit cards () {
     ace_of_spades := new_card(suit: Suit.SPADES, value: FaceValue.ACE)
-    mutate(card: ace_of_spades)
+
+    copy_of_card := ace_of_spades
+    copy_of_card.suit = Suit.HEARTS
+
+    # The following two lines should be both true
+    println(b: copy_of_card.suit == Suit.HEARTS)
+    println(b: ace_of_spades.suit == Suit.SPADES)
 }
