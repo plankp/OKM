@@ -23,10 +23,12 @@ public final class ReduceMovePass implements Pass {
             final Statement next = block.get(i + 1);
             // Remove the STORE_VAR statement if using the same register
             if (next.op == Operation.STORE_VAR && safeEquals(stmt.dst, next.lhs)) {
-                block.set(i + 1, new Statement(Operation.NOP));
-                // Convert the CALL statement's dst to STORE_VAR statement's
-                block.set(i--, new Statement(stmt.op, stmt.lhs, stmt.rhs, next.dst));
-                continue;
+                if (stmt.dst.isTemporary()) {
+                    block.set(i + 1, new Statement(Operation.NOP));
+                    // Convert the CALL statement's dst to STORE_VAR statement's
+                    block.set(i--, new Statement(stmt.op, stmt.lhs, stmt.rhs, next.dst));
+                    continue;
+                }
             }
         }
     }
