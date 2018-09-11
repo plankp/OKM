@@ -37,7 +37,7 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
     public static final Logger LOGGER = Logger.getLogger(LocalVisitor.class.getName());
 
     private static final Map<String, Tuple<Operation, UnaryOperator>> UNI_OP_MAPPING = new HashMap<>();
-    private static final Map<String, Tuple<Operation, BinaryOperator>> BIN_OP_MAPPING = new HashMap<>();
+    private static final Map<String, BinaryOperator> BIN_OP_MAPPING = new HashMap<>();
 
     // Only lowercase chars
     private static final Map<Character, Tuple<String, Integer>> NUM_LIT_INFO = new HashMap<>();
@@ -57,17 +57,17 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
         UNI_OP_MAPPING.put("!", new Tuple<>(Operation.UNARY_NOT, UnaryOperator.NOT));
         UNI_OP_MAPPING.put("~", new Tuple<>(Operation.UNARY_TILDA, UnaryOperator.TILDA));
 
-        BIN_OP_MAPPING.put("+", new Tuple<>(Operation.BINARY_ADD, BinaryOperator.ADD));
-        BIN_OP_MAPPING.put("-", new Tuple<>(Operation.BINARY_SUB, BinaryOperator.SUB));
-        BIN_OP_MAPPING.put("*", new Tuple<>(Operation.BINARY_MUL, BinaryOperator.MUL));
-        BIN_OP_MAPPING.put("/", new Tuple<>(Operation.BINARY_DIV, BinaryOperator.DIV));
-        BIN_OP_MAPPING.put("%", new Tuple<>(Operation.BINARY_MOD, BinaryOperator.MOD));
-        BIN_OP_MAPPING.put("<", new Tuple<>(Operation.BINARY_LESSER_THAN, BinaryOperator.LESSER_THAN));
-        BIN_OP_MAPPING.put(">", new Tuple<>(Operation.BINARY_GREATER_THAN, BinaryOperator.GREATER_THAN));
-        BIN_OP_MAPPING.put("<=", new Tuple<>(Operation.BINARY_LESSER_EQUALS, BinaryOperator.LESSER_EQUALS));
-        BIN_OP_MAPPING.put("=>", new Tuple<>(Operation.BINARY_GREATER_EQUALS, BinaryOperator.GREATER_EQUALS));
-        BIN_OP_MAPPING.put("==", new Tuple<>(Operation.BINARY_EQUALS, BinaryOperator.EQUALS));
-        BIN_OP_MAPPING.put("!=", new Tuple<>(Operation.BINARY_NOT_EQUALS, BinaryOperator.NOT_EQUALS));
+        BIN_OP_MAPPING.put("+", BinaryOperator.ADD);
+        BIN_OP_MAPPING.put("-", BinaryOperator.SUB);
+        BIN_OP_MAPPING.put("*", BinaryOperator.MUL);
+        BIN_OP_MAPPING.put("/", BinaryOperator.DIV);
+        BIN_OP_MAPPING.put("%", BinaryOperator.MOD);
+        BIN_OP_MAPPING.put("<", BinaryOperator.LESSER_THAN);
+        BIN_OP_MAPPING.put(">", BinaryOperator.GREATER_THAN);
+        BIN_OP_MAPPING.put("<=", BinaryOperator.LESSER_EQUALS);
+        BIN_OP_MAPPING.put("=>", BinaryOperator.GREATER_EQUALS);
+        BIN_OP_MAPPING.put("==", BinaryOperator.EQUALS);
+        BIN_OP_MAPPING.put("!=", BinaryOperator.NOT_EQUALS);
 
         NUM_LIT_INFO.put('b', new Tuple<>("byte", Byte.SIZE));
         NUM_LIT_INFO.put('s', new Tuple<>("short", Short.SIZE));
@@ -927,8 +927,7 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
     }
 
     private Type dispatchBinaryOperator(Type lhs, String name, Type rhs) {
-        final Tuple<Operation, BinaryOperator> tuple = BIN_OP_MAPPING.get(name);
-        final BinaryOperator op = tuple.getB();
+        final BinaryOperator op = BIN_OP_MAPPING.get(name);
         if (op == null) {
             throw new AssertionError("Unknown binary operator " + name);
         }
@@ -941,7 +940,7 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
         final Value temporary = Register.makeTemporary();
         Value a = VALUE_STACK.pop();  // value of rhs
         Value b = VALUE_STACK.pop();  // value of lhs
-        Operation opcode = tuple.getA();
+        Operation opcode = null;
 
         Operation[] cleanupSeq = new Operation[0];
 
@@ -961,12 +960,12 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
             a = applyRegisterTransfer(a, aSeq);
             b = applyRegisterTransfer(b, bSeq);
 
-            switch (opcode) {
-                case BINARY_ADD: opcode = useLong ? Operation.LONG_ADD : Operation.INT_ADD; break;
-                case BINARY_SUB: opcode = useLong ? Operation.LONG_SUB : Operation.INT_SUB; break;
-                case BINARY_MUL: opcode = useLong ? Operation.LONG_MUL : Operation.INT_MUL; break;
-                case BINARY_DIV: opcode = useLong ? Operation.LONG_DIV : Operation.INT_DIV; break;
-                case BINARY_MOD: opcode = useLong ? Operation.LONG_MOD : Operation.INT_MOD; break;
+            switch (op) {
+                case ADD: opcode = useLong ? Operation.LONG_ADD : Operation.INT_ADD; break;
+                case SUB: opcode = useLong ? Operation.LONG_SUB : Operation.INT_SUB; break;
+                case MUL: opcode = useLong ? Operation.LONG_MUL : Operation.INT_MUL; break;
+                case DIV: opcode = useLong ? Operation.LONG_DIV : Operation.INT_DIV; break;
+                case MOD: opcode = useLong ? Operation.LONG_MOD : Operation.INT_MOD; break;
             }
 
             // Downcast back to actual type is necessary
@@ -976,24 +975,38 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
             a = applyRegisterTransfer(a, aSeq);
             b = applyRegisterTransfer(b, bSeq);
 
-            switch (opcode) {
-                case BINARY_ADD: opcode = Operation.FLOAT_ADD; break;
-                case BINARY_SUB: opcode = Operation.FLOAT_SUB; break;
-                case BINARY_MUL: opcode = Operation.FLOAT_MUL; break;
-                case BINARY_DIV: opcode = Operation.FLOAT_DIV; break;
-                case BINARY_MOD: opcode = Operation.FLOAT_MOD; break;
+            switch (op) {
+                case ADD: opcode = Operation.FLOAT_ADD; break;
+                case SUB: opcode = Operation.FLOAT_SUB; break;
+                case MUL: opcode = Operation.FLOAT_MUL; break;
+                case DIV: opcode = Operation.FLOAT_DIV; break;
+                case MOD: opcode = Operation.FLOAT_MOD; break;
             }
         } else if ((aSeq = convertSeqToDouble(rhs)) != null
                 && (bSeq = convertSeqToDouble(lhs)) != null) {
             a = applyRegisterTransfer(a, aSeq);
             b = applyRegisterTransfer(b, bSeq);
 
-            switch (opcode) {
-                case BINARY_ADD: opcode = Operation.DOUBLE_ADD; break;
-                case BINARY_SUB: opcode = Operation.DOUBLE_SUB; break;
-                case BINARY_MUL: opcode = Operation.DOUBLE_MUL; break;
-                case BINARY_DIV: opcode = Operation.DOUBLE_DIV; break;
-                case BINARY_MOD: opcode = Operation.DOUBLE_MOD; break;
+            switch (op) {
+                case ADD: opcode = Operation.DOUBLE_ADD; break;
+                case SUB: opcode = Operation.DOUBLE_SUB; break;
+                case MUL: opcode = Operation.DOUBLE_MUL; break;
+                case DIV: opcode = Operation.DOUBLE_DIV; break;
+                case MOD: opcode = Operation.DOUBLE_MOD; break;
+            }
+        }
+
+        if (opcode == null) {
+            // TODO: Remove this switch block!
+            switch (op) {
+                case LESSER_THAN:    opcode = Operation.BINARY_LESSER_THAN; break;
+                case GREATER_THAN:   opcode = Operation.BINARY_GREATER_THAN; break;
+                case LESSER_EQUALS:  opcode = Operation.BINARY_LESSER_EQUALS; break;
+                case GREATER_EQUALS: opcode = Operation.BINARY_GREATER_EQUALS; break;
+                case EQUALS:         opcode = Operation.BINARY_EQUALS; break;
+                case NOT_EQUALS:     opcode = Operation.BINARY_NOT_EQUALS; break;
+                default:
+                    throw new AssertionError("Compiler failed to synthesize " + op + " for " + lhs + " and " + rhs);
             }
         }
 

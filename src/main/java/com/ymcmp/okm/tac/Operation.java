@@ -8,12 +8,6 @@ public enum Operation {
     UNARY_NOT,
     UNARY_TILDA,
 
-    BINARY_ADD,
-    BINARY_SUB,
-    BINARY_MUL,
-    BINARY_DIV,
-    BINARY_MOD,
-
     BINARY_LESSER_THAN,
     BINARY_GREATER_THAN,
     BINARY_LESSER_EQUALS,
@@ -133,11 +127,7 @@ public enum Operation {
             case UNARY_SUB:
             case UNARY_NOT:
             case UNARY_TILDA:
-            case BINARY_ADD:
-            case BINARY_SUB:
-            case BINARY_MUL:
-            case BINARY_DIV:
-            case BINARY_MOD:
+
             case BINARY_LESSER_THAN:
             case BINARY_GREATER_THAN:
             case BINARY_LESSER_EQUALS:
