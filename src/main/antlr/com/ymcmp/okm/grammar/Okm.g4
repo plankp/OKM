@@ -62,7 +62,6 @@ SUB: '-';
 MUL: '*';
 DIV: '/';
 MOD: '%';
-NOT: '!';
 TILDA: '~';
 
 program: decls*;
@@ -153,7 +152,7 @@ expr:
     | symbolName                                       # exprSymbol
     | base = expr DOT attr = IDENT                     # exprAccess
     | dest = expr SET value = expr                     # exprAssign
-    | op = (ADD | SUB | NOT | TILDA | AMP) rhs = expr  # exprUnary
+    | op = (ADD | SUB | TILDA | AMP) rhs = expr        # exprUnary
     | lhs = expr op = (MUL | DIV | MOD) rhs = expr     # exprMulDivMod
     | lhs = expr op = (ADD | SUB) rhs = expr           # exprAddSub
     | lhs = expr op = (GT | GE | LE | LT) rhs = expr   # exprRelCmp

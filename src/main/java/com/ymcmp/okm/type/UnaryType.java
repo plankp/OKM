@@ -71,8 +71,6 @@ public final class UnaryType implements Type {
     @Override
     public Type tryPerformUnary(UnaryOperator op) {
         switch (op) {
-            case NOT:
-                return "bool".equals(name) ? this : null;
             case ADD:
             case SUB:
                 return NUM_TYPE_DISTANCE.get(name) != null ? this : null;

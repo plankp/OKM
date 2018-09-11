@@ -3,11 +3,6 @@ package com.ymcmp.okm.tac;
 public enum Operation {
     NOP,
 
-    UNARY_ADD,
-    UNARY_SUB,
-    UNARY_NOT,
-    UNARY_TILDA,
-
     BINARY_LESSER_THAN,
     BINARY_GREATER_THAN,
     BINARY_LESSER_EQUALS,
@@ -123,11 +118,6 @@ public enum Operation {
 
     public boolean hasPotentialSideEffects() {
         switch (this) {
-            case UNARY_ADD:
-            case UNARY_SUB:
-            case UNARY_NOT:
-            case UNARY_TILDA:
-
             case BINARY_LESSER_THAN:
             case BINARY_GREATER_THAN:
             case BINARY_LESSER_EQUALS:

@@ -36,7 +36,7 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
 
     public static final Logger LOGGER = Logger.getLogger(LocalVisitor.class.getName());
 
-    private static final Map<String, Tuple<Operation, UnaryOperator>> UNI_OP_MAPPING = new HashMap<>();
+    private static final Map<String, UnaryOperator> UNI_OP_MAPPING = new HashMap<>();
     private static final Map<String, BinaryOperator> BIN_OP_MAPPING = new HashMap<>();
 
     // Only lowercase chars
@@ -52,10 +52,9 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
     private static final UnaryType TYPE_DOUBLE = UnaryType.getType("double");
 
     static {
-        UNI_OP_MAPPING.put("+", new Tuple<>(Operation.UNARY_ADD, UnaryOperator.ADD));
-        UNI_OP_MAPPING.put("-", new Tuple<>(Operation.UNARY_SUB, UnaryOperator.SUB));
-        UNI_OP_MAPPING.put("!", new Tuple<>(Operation.UNARY_NOT, UnaryOperator.NOT));
-        UNI_OP_MAPPING.put("~", new Tuple<>(Operation.UNARY_TILDA, UnaryOperator.TILDA));
+        UNI_OP_MAPPING.put("+", UnaryOperator.ADD);
+        UNI_OP_MAPPING.put("-", UnaryOperator.SUB);
+        UNI_OP_MAPPING.put("~", UnaryOperator.TILDA);
 
         BIN_OP_MAPPING.put("+", BinaryOperator.ADD);
         BIN_OP_MAPPING.put("-", BinaryOperator.SUB);
@@ -1056,8 +1055,7 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
             return processMakeRef(ctx.rhs);
         }
 
-        final Tuple<Operation, UnaryOperator> tuple = UNI_OP_MAPPING.get(name);
-        final UnaryOperator op = tuple.getB();
+        final UnaryOperator op = UNI_OP_MAPPING.get(name);
         if (op == null) {
             throw new AssertionError("Unknown unary operator " + name);
         }
@@ -1070,7 +1068,7 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
 
         final Value temporary = Register.makeTemporary();
         Value value = VALUE_STACK.pop();
-        Operation opcode = tuple.getA();
+        Operation opcode = null;
 
         Operation[] cleanupSeq = new Operation[0];
 
@@ -1086,16 +1084,19 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
 
             value = applyRegisterTransfer(value, baseSeq);
 
-            switch (opcode) {
-                case UNARY_ADD:   opcode = Operation.STORE_VAR; break;
-                case UNARY_SUB:   opcode = useLong ? Operation.LONG_NEG : Operation.INT_NEG; break;
-                case UNARY_TILDA: opcode = useLong ? Operation.LONG_CPL : Operation.INT_CPL; break;
+            switch (op) {
+                case ADD:   opcode = Operation.STORE_VAR; break;
+                case SUB:   opcode = useLong ? Operation.LONG_NEG : Operation.INT_NEG; break;
+                case TILDA: opcode = useLong ? Operation.LONG_CPL : Operation.INT_CPL; break;
             }
 
             // Downcast back to actual type is necessary
             cleanupSeq = uncastLongSequence(useLong, result);
         }
 
+        if (opcode == null) {
+            throw new AssertionError("Compiler failed to synthesize " + op + " for " + base);
+        }
         funcStmts.add(new Statement(opcode, value, temporary));
         VALUE_STACK.push(applyRegisterTransfer(temporary, cleanupSeq));
 
