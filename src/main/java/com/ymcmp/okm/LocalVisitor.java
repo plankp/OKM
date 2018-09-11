@@ -34,7 +34,7 @@ import com.ymcmp.okm.grammar.OkmBaseVisitor;
 
 public class LocalVisitor extends OkmBaseVisitor<Object> {
 
-    private static final Logger LOGGER = Logger.getLogger(LocalVisitor.class.getName());
+    public static final Logger LOGGER = Logger.getLogger(LocalVisitor.class.getName());
 
     private static final Map<String, Tuple<Operation, UnaryOperator>> UNI_OP_MAPPING = new HashMap<>();
     private static final Map<String, Tuple<Operation, BinaryOperator>> BIN_OP_MAPPING = new HashMap<>();
@@ -96,6 +96,8 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
         }
     };
 
+    private final List<Path> SEARCH_PATH;
+
     private final Map<Path, Module> LOADED_MODULES = new HashMap<>();
     private final ArrayDeque<Value> VALUE_STACK = new ArrayDeque<>();
 
@@ -115,9 +117,17 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
 
     private List<Tuple<Scope, FunctionDeclContext>> pendingFunctions;
 
-    public Map<String, List<Statement>> compile(final Path p) {
+    public LocalVisitor() {
+        this(Arrays.asList());
+    }
+
+    public LocalVisitor(final List<Path> moduleSearchPath) {
+        this.SEARCH_PATH = moduleSearchPath == null ? Arrays.asList() : moduleSearchPath;
+    }
+
+    public Map<String, List<Statement>> compile(final List<Path> ps) {
         RESULT.clear();
-        processModule(p);
+        ps.forEach(this::processModule);
 
         // define a function called unit @init() { }
         // which performs initializations
@@ -282,10 +292,16 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
     public Module visitImportPath(final ImportPathContext ctx) {
         Path file = currentFile.getParent();
 
+        int trySearchPathIdx = -1;
         // Unshift directories
         for (int i = 0; i < ctx.unshift.size(); ++i) {
             if ((file = file.getParent()) == null) {
-                // Cannot unshift anymore, TODO: Search other paths
+                final int idx = ++trySearchPathIdx;
+                if (idx < SEARCH_PATH.size()) {
+                    file = SEARCH_PATH.get(idx);
+                    i = -1; // reset loop state
+                    continue;
+                }
                 throw new CannotLoadFileException(null);
             }
         }
