@@ -1,0 +1,28 @@
+import std.io(:println(b))
+
+unit cmps() {
+    compare_long()
+    compare_float()
+    compare_double()
+}
+
+unit compare_long() {
+    println(b: 1L == 1L)
+    println(b: 0L != 1L)
+    println(b: 0L < 1L)
+    println(b: 1L > 0L)
+}
+
+unit compare_float() {
+    println(b: 1F == 1F)
+    println(b: 0F != 1F)
+    println(b: 0F < 1F)
+    println(b: 1F > 0F)
+}
+
+unit compare_double() {
+    println(b: 1.0 == 1.0)
+    println(b: 0.0 != 1.0)
+    println(b: 0.0 < 1.0)
+    println(b: 1.0 > 0.0)
+}

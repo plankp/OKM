@@ -3,24 +3,6 @@ package com.ymcmp.okm.tac;
 public enum Operation {
     NOP,
 
-    UNARY_ADD,
-    UNARY_SUB,
-    UNARY_NOT,
-    UNARY_TILDA,
-
-    BINARY_ADD,
-    BINARY_SUB,
-    BINARY_MUL,
-    BINARY_DIV,
-    BINARY_MOD,
-
-    BINARY_LESSER_THAN,
-    BINARY_GREATER_THAN,
-    BINARY_LESSER_EQUALS,
-    BINARY_GREATER_EQUALS,
-    BINARY_EQUALS,
-    BINARY_NOT_EQUALS,
-
     CONV_BYTE_INT,
     CONV_SHORT_INT,
     CONV_LONG_INT,
@@ -36,6 +18,13 @@ public enum Operation {
     CONV_LONG_DOUBLE,
     CONV_FLOAT_DOUBLE,
 
+    INT_LT,
+    INT_GT,
+    INT_LE,
+    INT_GE,
+    INT_EQ,
+    INT_NE,
+
     INT_NEG,
     INT_CPL,
 
@@ -44,6 +33,8 @@ public enum Operation {
     INT_MUL,
     INT_DIV,
     INT_MOD,
+
+    LONG_CMP,
 
     LONG_NEG,
     LONG_CPL,
@@ -54,6 +45,8 @@ public enum Operation {
     LONG_DIV,
     LONG_MOD,
 
+    FLOAT_CMP,
+
     FLOAT_NEG,
 
     FLOAT_ADD,
@@ -61,6 +54,8 @@ public enum Operation {
     FLOAT_MUL,
     FLOAT_DIV,
     FLOAT_MOD,
+
+    DOUBLE_CMP,
 
     DOUBLE_NEG,
 
@@ -102,6 +97,17 @@ public enum Operation {
     CALL,
     TAILCALL;
 
+    public boolean isCmp() {
+        switch (this) {
+            case LONG_CMP:
+            case FLOAT_CMP:
+            case DOUBLE_CMP:
+                return true;
+            default:
+                return false;
+        }
+    }
+
     public boolean readsFromDst() {
         switch (this) {
             case PUSH_PARAM:
@@ -129,21 +135,6 @@ public enum Operation {
 
     public boolean hasPotentialSideEffects() {
         switch (this) {
-            case UNARY_ADD:
-            case UNARY_SUB:
-            case UNARY_NOT:
-            case UNARY_TILDA:
-            case BINARY_ADD:
-            case BINARY_SUB:
-            case BINARY_MUL:
-            case BINARY_DIV:
-            case BINARY_MOD:
-            case BINARY_LESSER_THAN:
-            case BINARY_GREATER_THAN:
-            case BINARY_LESSER_EQUALS:
-            case BINARY_GREATER_EQUALS:
-            case BINARY_EQUALS:
-            case BINARY_NOT_EQUALS:
             case STORE_VAR:
             case REFER_VAR:
             case REFER_ATTR:

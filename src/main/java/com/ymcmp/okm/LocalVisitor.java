@@ -36,8 +36,8 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
 
     public static final Logger LOGGER = Logger.getLogger(LocalVisitor.class.getName());
 
-    private static final Map<String, Tuple<Operation, UnaryOperator>> UNI_OP_MAPPING = new HashMap<>();
-    private static final Map<String, Tuple<Operation, BinaryOperator>> BIN_OP_MAPPING = new HashMap<>();
+    private static final Map<String, UnaryOperator> UNI_OP_MAPPING = new HashMap<>();
+    private static final Map<String, BinaryOperator> BIN_OP_MAPPING = new HashMap<>();
 
     // Only lowercase chars
     private static final Map<Character, Tuple<String, Integer>> NUM_LIT_INFO = new HashMap<>();
@@ -51,23 +51,24 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
     private static final UnaryType TYPE_FLOAT = UnaryType.getType("float");
     private static final UnaryType TYPE_DOUBLE = UnaryType.getType("double");
 
-    static {
-        UNI_OP_MAPPING.put("+", new Tuple<>(Operation.UNARY_ADD, UnaryOperator.ADD));
-        UNI_OP_MAPPING.put("-", new Tuple<>(Operation.UNARY_SUB, UnaryOperator.SUB));
-        UNI_OP_MAPPING.put("!", new Tuple<>(Operation.UNARY_NOT, UnaryOperator.NOT));
-        UNI_OP_MAPPING.put("~", new Tuple<>(Operation.UNARY_TILDA, UnaryOperator.TILDA));
+    private static final Fixnum INT_ZERO = new Fixnum(0, Integer.SIZE);
 
-        BIN_OP_MAPPING.put("+", new Tuple<>(Operation.BINARY_ADD, BinaryOperator.ADD));
-        BIN_OP_MAPPING.put("-", new Tuple<>(Operation.BINARY_SUB, BinaryOperator.SUB));
-        BIN_OP_MAPPING.put("*", new Tuple<>(Operation.BINARY_MUL, BinaryOperator.MUL));
-        BIN_OP_MAPPING.put("/", new Tuple<>(Operation.BINARY_DIV, BinaryOperator.DIV));
-        BIN_OP_MAPPING.put("%", new Tuple<>(Operation.BINARY_MOD, BinaryOperator.MOD));
-        BIN_OP_MAPPING.put("<", new Tuple<>(Operation.BINARY_LESSER_THAN, BinaryOperator.LESSER_THAN));
-        BIN_OP_MAPPING.put(">", new Tuple<>(Operation.BINARY_GREATER_THAN, BinaryOperator.GREATER_THAN));
-        BIN_OP_MAPPING.put("<=", new Tuple<>(Operation.BINARY_LESSER_EQUALS, BinaryOperator.LESSER_EQUALS));
-        BIN_OP_MAPPING.put("=>", new Tuple<>(Operation.BINARY_GREATER_EQUALS, BinaryOperator.GREATER_EQUALS));
-        BIN_OP_MAPPING.put("==", new Tuple<>(Operation.BINARY_EQUALS, BinaryOperator.EQUALS));
-        BIN_OP_MAPPING.put("!=", new Tuple<>(Operation.BINARY_NOT_EQUALS, BinaryOperator.NOT_EQUALS));
+    static {
+        UNI_OP_MAPPING.put("+", UnaryOperator.ADD);
+        UNI_OP_MAPPING.put("-", UnaryOperator.SUB);
+        UNI_OP_MAPPING.put("~", UnaryOperator.TILDA);
+
+        BIN_OP_MAPPING.put("+", BinaryOperator.ADD);
+        BIN_OP_MAPPING.put("-", BinaryOperator.SUB);
+        BIN_OP_MAPPING.put("*", BinaryOperator.MUL);
+        BIN_OP_MAPPING.put("/", BinaryOperator.DIV);
+        BIN_OP_MAPPING.put("%", BinaryOperator.MOD);
+        BIN_OP_MAPPING.put("<", BinaryOperator.LESSER_THAN);
+        BIN_OP_MAPPING.put(">", BinaryOperator.GREATER_THAN);
+        BIN_OP_MAPPING.put("<=", BinaryOperator.LESSER_EQUALS);
+        BIN_OP_MAPPING.put("=>", BinaryOperator.GREATER_EQUALS);
+        BIN_OP_MAPPING.put("==", BinaryOperator.EQUALS);
+        BIN_OP_MAPPING.put("!=", BinaryOperator.NOT_EQUALS);
 
         NUM_LIT_INFO.put('b', new Tuple<>("byte", Byte.SIZE));
         NUM_LIT_INFO.put('s', new Tuple<>("short", Short.SIZE));
@@ -138,7 +139,7 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
         for (final String func : MODULE_INITS) {
             initializer.add(new Statement(Operation.CALL, Register.makeNamed(func), Register.makeTemporary()));
         }
-        // Use RETURN_UNIT 
+        // Use RETURN_UNIT
         initializer.add(new Statement(Operation.RETURN_UNIT));
         RESULT.put("@init", initializer);
 
@@ -861,7 +862,7 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
         if (TYPE_SHORT.isSameType(t)) {
             return new Operation[] { Operation.CONV_SHORT_INT, Operation.CONV_INT_LONG };
         }
-        if (TYPE_INT.isSameType(t)) {
+        if (TYPE_INT.isSameType(t) || t instanceof EnumKeyType) {
             return new Operation[] { Operation.CONV_INT_LONG };
         }
         if (TYPE_LONG.isSameType(t)) {
@@ -927,8 +928,7 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
     }
 
     private Type dispatchBinaryOperator(Type lhs, String name, Type rhs) {
-        final Tuple<Operation, BinaryOperator> tuple = BIN_OP_MAPPING.get(name);
-        final BinaryOperator op = tuple.getB();
+        final BinaryOperator op = BIN_OP_MAPPING.get(name);
         if (op == null) {
             throw new AssertionError("Unknown binary operator " + name);
         }
@@ -941,7 +941,7 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
         final Value temporary = Register.makeTemporary();
         Value a = VALUE_STACK.pop();  // value of rhs
         Value b = VALUE_STACK.pop();  // value of lhs
-        Operation opcode = tuple.getA();
+        Operation opcode = null;
 
         Operation[] cleanupSeq = new Operation[0];
 
@@ -961,43 +961,101 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
             a = applyRegisterTransfer(a, aSeq);
             b = applyRegisterTransfer(b, bSeq);
 
-            switch (opcode) {
-                case BINARY_ADD: opcode = useLong ? Operation.LONG_ADD : Operation.INT_ADD; break;
-                case BINARY_SUB: opcode = useLong ? Operation.LONG_SUB : Operation.INT_SUB; break;
-                case BINARY_MUL: opcode = useLong ? Operation.LONG_MUL : Operation.INT_MUL; break;
-                case BINARY_DIV: opcode = useLong ? Operation.LONG_DIV : Operation.INT_DIV; break;
-                case BINARY_MOD: opcode = useLong ? Operation.LONG_MOD : Operation.INT_MOD; break;
+            boolean generateCleanup = false;
+            switch (op) {
+                case ADD: opcode = useLong ? Operation.LONG_ADD : Operation.INT_ADD; generateCleanup = true; break;
+                case SUB: opcode = useLong ? Operation.LONG_SUB : Operation.INT_SUB; generateCleanup = true; break;
+                case MUL: opcode = useLong ? Operation.LONG_MUL : Operation.INT_MUL; generateCleanup = true; break;
+                case DIV: opcode = useLong ? Operation.LONG_DIV : Operation.INT_DIV; generateCleanup = true; break;
+                case MOD: opcode = useLong ? Operation.LONG_MOD : Operation.INT_MOD; generateCleanup = true; break;
+                case LESSER_THAN:    opcode = useLong ? Operation.LONG_CMP : Operation.INT_LT; break;
+                case GREATER_THAN:   opcode = useLong ? Operation.LONG_CMP : Operation.INT_GT; break;
+                case LESSER_EQUALS:  opcode = useLong ? Operation.LONG_CMP : Operation.INT_LE; break;
+                case GREATER_EQUALS: opcode = useLong ? Operation.LONG_CMP : Operation.INT_GE; break;
+                case EQUALS:         opcode = useLong ? Operation.LONG_CMP : Operation.INT_EQ; break;
+                case NOT_EQUALS:     opcode = useLong ? Operation.LONG_CMP : Operation.INT_NE; break;
             }
 
-            // Downcast back to actual type is necessary
-            cleanupSeq = uncastLongSequence(useLong, result);
+            if (generateCleanup) {
+                // Downcast back to actual type is necessary
+                cleanupSeq = uncastLongSequence(useLong, result);
+            }
         } else if ((aSeq = convertSeqToFloat(rhs)) != null
                 && (bSeq = convertSeqToFloat(lhs)) != null) {
             a = applyRegisterTransfer(a, aSeq);
             b = applyRegisterTransfer(b, bSeq);
 
-            switch (opcode) {
-                case BINARY_ADD: opcode = Operation.FLOAT_ADD; break;
-                case BINARY_SUB: opcode = Operation.FLOAT_SUB; break;
-                case BINARY_MUL: opcode = Operation.FLOAT_MUL; break;
-                case BINARY_DIV: opcode = Operation.FLOAT_DIV; break;
-                case BINARY_MOD: opcode = Operation.FLOAT_MOD; break;
+            switch (op) {
+                case ADD: opcode = Operation.FLOAT_ADD; break;
+                case SUB: opcode = Operation.FLOAT_SUB; break;
+                case MUL: opcode = Operation.FLOAT_MUL; break;
+                case DIV: opcode = Operation.FLOAT_DIV; break;
+                case MOD: opcode = Operation.FLOAT_MOD; break;
+                case LESSER_THAN:
+                case GREATER_THAN:
+                case LESSER_EQUALS:
+                case GREATER_EQUALS:
+                case EQUALS:
+                case NOT_EQUALS:
+                    opcode = Operation.FLOAT_CMP;
+                    break;
             }
         } else if ((aSeq = convertSeqToDouble(rhs)) != null
                 && (bSeq = convertSeqToDouble(lhs)) != null) {
             a = applyRegisterTransfer(a, aSeq);
             b = applyRegisterTransfer(b, bSeq);
 
-            switch (opcode) {
-                case BINARY_ADD: opcode = Operation.DOUBLE_ADD; break;
-                case BINARY_SUB: opcode = Operation.DOUBLE_SUB; break;
-                case BINARY_MUL: opcode = Operation.DOUBLE_MUL; break;
-                case BINARY_DIV: opcode = Operation.DOUBLE_DIV; break;
-                case BINARY_MOD: opcode = Operation.DOUBLE_MOD; break;
+            switch (op) {
+                case ADD: opcode = Operation.DOUBLE_ADD; break;
+                case SUB: opcode = Operation.DOUBLE_SUB; break;
+                case MUL: opcode = Operation.DOUBLE_MUL; break;
+                case DIV: opcode = Operation.DOUBLE_DIV; break;
+                case MOD: opcode = Operation.DOUBLE_MOD; break;
+                case LESSER_THAN:
+                case GREATER_THAN:
+                case LESSER_EQUALS:
+                case GREATER_EQUALS:
+                case EQUALS:
+                case NOT_EQUALS:
+                    opcode = Operation.DOUBLE_CMP;
+                    break;
             }
         }
 
-        funcStmts.add(new Statement(opcode, b, a, temporary));
+        if (opcode == null) {
+            throw new AssertionError("Compiler failed to synthesize " + op + " for " + lhs + " and " + rhs);
+        }
+
+        if (opcode.isCmp()) {
+            // These opcodes return an integer instead of a boolean
+            // an additional INT_* comparison is needed
+            final Register cmpValue = Register.makeTemporary();
+            funcStmts.add(new Statement(opcode, b, a, cmpValue));
+            switch (op) {
+                case LESSER_THAN:       // cmpValue < 0
+                    funcStmts.add(new Statement(Operation.INT_LT, cmpValue, INT_ZERO, temporary));
+                    break;
+                case GREATER_THAN:
+                    funcStmts.add(new Statement(Operation.INT_GT, cmpValue, INT_ZERO, temporary));
+                    break;
+                case LESSER_EQUALS:
+                    funcStmts.add(new Statement(Operation.INT_LE, cmpValue, INT_ZERO, temporary));
+                    break;
+                case GREATER_EQUALS:
+                    funcStmts.add(new Statement(Operation.INT_GE, cmpValue, INT_ZERO, temporary));
+                    break;
+                case EQUALS:
+                    funcStmts.add(new Statement(Operation.INT_EQ, cmpValue, INT_ZERO, temporary));
+                    break;
+                case NOT_EQUALS:
+                    funcStmts.add(new Statement(Operation.INT_NE, cmpValue, INT_ZERO, temporary));
+                    break;
+                default:
+                    throw new AssertionError("Unknown additional comparison " + op);
+            }
+        } else {
+            funcStmts.add(new Statement(opcode, b, a, temporary));
+        }
         VALUE_STACK.push(applyRegisterTransfer(temporary, cleanupSeq));
 
         LOGGER.info(lhs + " " + name + " " + rhs + " yields " + result);
@@ -1043,8 +1101,7 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
             return processMakeRef(ctx.rhs);
         }
 
-        final Tuple<Operation, UnaryOperator> tuple = UNI_OP_MAPPING.get(name);
-        final UnaryOperator op = tuple.getB();
+        final UnaryOperator op = UNI_OP_MAPPING.get(name);
         if (op == null) {
             throw new AssertionError("Unknown unary operator " + name);
         }
@@ -1057,7 +1114,7 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
 
         final Value temporary = Register.makeTemporary();
         Value value = VALUE_STACK.pop();
-        Operation opcode = tuple.getA();
+        Operation opcode = null;
 
         Operation[] cleanupSeq = new Operation[0];
 
@@ -1073,14 +1130,18 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
 
             value = applyRegisterTransfer(value, baseSeq);
 
-            switch (opcode) {
-                case UNARY_ADD:   opcode = Operation.STORE_VAR; break;
-                case UNARY_SUB:   opcode = useLong ? Operation.LONG_NEG : Operation.INT_NEG; break;
-                case UNARY_TILDA: opcode = useLong ? Operation.LONG_CPL : Operation.INT_CPL; break;
+            switch (op) {
+                case ADD:   opcode = Operation.STORE_VAR; break;
+                case SUB:   opcode = useLong ? Operation.LONG_NEG : Operation.INT_NEG; break;
+                case TILDA: opcode = useLong ? Operation.LONG_CPL : Operation.INT_CPL; break;
             }
 
             // Downcast back to actual type is necessary
             cleanupSeq = uncastLongSequence(useLong, result);
+        }
+
+        if (opcode == null) {
+            throw new AssertionError("Compiler failed to synthesize " + op + " for " + base);
         }
 
         funcStmts.add(new Statement(opcode, value, temporary));
