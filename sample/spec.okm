@@ -2,11 +2,6 @@
 # unless referenced by another module. In this demonstration, this module is
 # called `spec`
 
-# Seems harmful, and it most likely will be unless there is another file named
-# spec.okm in the OKM_LOADPATH environment variable. This will halt the
-# compilation if this was this file is the only spec.okm found.
-import spec
-
 # This imports everything from std/io.okm under the namespace with private
 # visibility. All modules are only loaded once.
 import std.io
@@ -57,13 +52,13 @@ public int plus1 (a, b :int) {
 }
 
 # The following function called add(a, b) is protected
-protected double add (a :int b :double) {
+protected double add (a :int, b :double) {
     return a + b
 }
 
 # The following declares a function that takes no parameters and returns unit
 # named foo as private.
-unit foo {
+unit foo() {
     # return is omitted since implicit returns always return unit. Imagine a
     # case where it tail calling another unit returning function. In order for
     # tail calls to be guaranteed, you would write return bar() if bar was a
