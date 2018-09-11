@@ -17,6 +17,14 @@ public final class Mutable<T extends Value> implements Serializable, Value {
     }
 
     @Override
+    public Mutable<T> duplicate() {
+        // Note: the object it points to is not duplicated!
+        final Mutable<T> t = new Mutable<>();
+        t.setValue(mutable);
+        return t;
+    }
+
+    @Override
     public boolean isNumeric() {
         return mutable.isNumeric();
     }

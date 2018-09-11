@@ -68,6 +68,11 @@ public final class Fixnum implements Serializable, Value, Comparable<Fixnum> {
     }
 
     @Override
+    public Fixnum duplicate() {
+        return this;
+    }
+
+    @Override
     public boolean isNumeric() {
         return true;
     }

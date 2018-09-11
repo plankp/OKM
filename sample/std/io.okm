@@ -5,3 +5,11 @@ public unit print (i :int) {
 public unit println (i :int) {
     # Runtime fill in
 }
+
+public unit print (b :bool) {
+    # Runtime fill in
+}
+
+public unit println (b :bool) {
+    # Runtime fill in
+}

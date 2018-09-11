@@ -66,6 +66,6 @@ public final class StructType implements Type {
 
     @Override
     public String toString() {
-        return "struct " + name;
+        return (allocated ? "allocated " : "") + "struct " + name;
     }
 }

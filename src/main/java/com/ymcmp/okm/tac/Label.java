@@ -24,6 +24,11 @@ public final class Label implements Serializable, Value {
     }
 
     @Override
+    public Label duplicate() {
+        return new Label(address);
+    }
+
+    @Override
     public boolean isNumeric() {
         // For now...
         return false;

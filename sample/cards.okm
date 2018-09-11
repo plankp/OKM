@@ -1,3 +1,5 @@
+import std.io(:println(b), :println(i))
+
 # SPADES = 0, ..., CLUBS = 3
 # They have type Suit but has conversion to int
 # Ints cannot convert to Suit, however
@@ -22,6 +24,13 @@ Card new_card (suit :Suit, value :FaceValue) {
     return card
 }
 
+# All things pass by value, structs included
+unit mutate (card :Card) {
+    card.suit = Suit.HEARTS
+    card.value = FaceValue.QUEEN
+}
+
 unit cards () {
     ace_of_spades := new_card(suit: Suit.SPADES, value: FaceValue.ACE)
+    mutate(card: ace_of_spades)
 }

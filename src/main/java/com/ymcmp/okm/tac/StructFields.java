@@ -10,6 +10,7 @@ public final class StructFields implements Value {
         this.fields = new HashMap<>();
     }
 
+    @Override
     public StructFields duplicate() {
         final StructFields newStruct = new StructFields();
         newStruct.fields.putAll(fields);

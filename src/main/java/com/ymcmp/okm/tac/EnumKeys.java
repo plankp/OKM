@@ -20,6 +20,11 @@ public final class EnumKeys implements Value {
     }
 
     @Override
+    public EnumKeys duplicate() {
+        return this;
+    }
+
+    @Override
     public boolean isNumeric() {
         return false;
     }

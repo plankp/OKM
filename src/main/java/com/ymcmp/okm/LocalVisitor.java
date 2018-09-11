@@ -417,7 +417,7 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
         final List<Tuple<String, Type>> list = new ArrayList<>();
         final Type type = visitType(ctx.t);
         for (int i = 0; i < ctx.getChildCount() - 2; i += 2) {
-            list.add(new Tuple<>(ctx.getChild(i).getText(), type));
+            list.add(new Tuple<>(ctx.getChild(i).getText(), type instanceof StructType ? ((StructType) type).allocate() : type));
         }
         return list;
     }
@@ -433,9 +433,13 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
 
     @Override
     public Object visitFunctionDecl(FunctionDeclContext ctx) {
-        final List<Tuple<String, Type>> params = ctx.params == null ? Collections.EMPTY_LIST : visitParamList(ctx.params);
-        final Type ret = visitType(ctx.ret);
         final String base = ctx.base.getText();
+        final List<Tuple<String, Type>> params = ctx.params == null ? Collections.EMPTY_LIST : visitParamList(ctx.params);
+
+        Type ret = visitType(ctx.ret);
+        if (ret instanceof StructType) {
+            ret = ((StructType) ret).allocate();
+        }
 
         final String name = Module.makeFuncName(base, params.stream().map(Tuple::getA).toArray(String[]::new));
         final Type[] paramType = params.stream().map(Tuple::getB).toArray(Type[]::new);

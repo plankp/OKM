@@ -29,6 +29,11 @@ public final class Register implements Serializable, Value {
     }
 
     @Override
+    public Register duplicate() {
+        return this;
+    }
+
+    @Override
     public boolean isNumeric() {
         return false;
     }

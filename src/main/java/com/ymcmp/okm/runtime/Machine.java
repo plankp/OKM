@@ -40,6 +40,8 @@ public class Machine {
                 // std.io
                     case "print:i:":    System.out.print(toInt(callStack.pop())); return true;
                     case "println:i:":  System.out.println(toInt(callStack.pop())); return true;
+                    case "print:b:":    System.out.print(toBool(callStack.pop())); return true;
+                    case "println:b:":  System.out.println(toBool(callStack.pop())); return true;
                 // std.math
                     case "atan2:y:x:":      mut.setValue(new Fixnum(Math.atan2(toDouble(callStack.pop()), toDouble(callStack.pop())))); return true;
                     case "asin:x:":         mut.setValue(new Fixnum(Math.asin(toDouble(callStack.pop())))); return true;
@@ -243,7 +245,8 @@ public class Machine {
                         locals.put(stmt.dst, callStack.pop());
                         break;
                     case PUSH_PARAM:    // PUSH_PARAM       dst:value
-                        callStack.push(fetchValue(stmt.dst));
+                        // Pass by value, (including structs)
+                        callStack.push(fetchValue(stmt.dst).duplicate());
                         break;
                     case CALL:          // CALL             dst:store, lhs:callsite
                         locals.put(stmt.dst, execute(code, fetchValue(stmt.lhs).toString()));
@@ -278,6 +281,10 @@ public class Machine {
 
     private static Fixnum makeBool(final boolean b) {
         return b ? Fixnum.TRUE : Fixnum.FALSE;
+    }
+
+    private static boolean toBool(final Value v) {
+        return toLong(v) != 0;
     }
 
     private static int toInt(final Value v) {
