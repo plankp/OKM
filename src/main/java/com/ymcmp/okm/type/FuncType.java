@@ -52,11 +52,11 @@ public final class FuncType implements Type {
                 return false;
             }
             for (int i = 0; i < params.length; ++i) {
-                if (!params[i].canConvertTo(other.params[i])) {
+                if (!other.params[i].canConvertTo(params[i])) {
                     return false;
                 }
             }
-            return other.ret.canConvertTo(ret);
+            return ret.canConvertTo(other.ret);
         }
         return Type.super.canConvertTo(t);
     }
