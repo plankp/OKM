@@ -408,7 +408,7 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
     public Type visitType(TypeContext ctx) {
         final String name = ctx.getText();
         final Module.Entry ent = currentModule.get(name);
-        if (ent.isType) {
+        if (ent != null && ent.isType) {
             final Type t = ent.type;
             if (t instanceof EnumType) {
                 return ((EnumType) t).createCorrespondingKey();
@@ -696,6 +696,35 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
         return performCall(callable, args);
     }
 
+    private Value insertConversion(final Value val, Type src, Type dst) {
+        if (!src.isSameType(dst)) {
+            if (src instanceof EnumKeyType) {
+                // hack: we redo the above routine as if src was int
+                src = TYPE_INT;
+            }
+            if (!src.isSameType(dst)) {
+                // Implement type casting
+                final String synthName = src + "_" + dst;
+                switch (synthName) {
+                    case "byte_int":     return applyRegisterTransfer(val, Operation.CONV_BYTE_INT);
+                    case "short_int":    return applyRegisterTransfer(val, Operation.CONV_SHORT_INT);
+                    case "long_int":     return applyRegisterTransfer(val, Operation.CONV_LONG_INT);
+                    case "int_byte":     return applyRegisterTransfer(val, Operation.CONV_INT_BYTE);
+                    case "int_short":    return applyRegisterTransfer(val, Operation.CONV_INT_SHORT);
+                    case "int_long":     return applyRegisterTransfer(val, Operation.CONV_INT_LONG);
+                    case "int_float":    return applyRegisterTransfer(val, Operation.CONV_INT_FLOAT);
+                    case "long_float":   return applyRegisterTransfer(val, Operation.CONV_LONG_FLOAT);
+                    case "int_double":   return applyRegisterTransfer(val, Operation.CONV_INT_DOUBLE);
+                    case "long_double":  return applyRegisterTransfer(val, Operation.CONV_LONG_DOUBLE);
+                    case "float_double": return applyRegisterTransfer(val, Operation.CONV_FLOAT_DOUBLE);
+                    default:
+                        throw new AssertionError("Unknown conversion rule: " + synthName);
+                }
+            }
+        }
+        return val;
+    }
+
     private Type performCall(Type base, Type... args) {
         final Type result = base.tryPerformCall(args);
         if (result == null) {
@@ -708,30 +737,8 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
             Value val = VALUE_STACK.pop();
             Type argType = args[i];
             Type paramType = null;
-            if (ftype != null && !argType.isSameType((paramType = ftype.params[i]))) {
-                if (argType instanceof EnumKeyType) {
-                    // hack: we redo the above routine as if argType was int
-                    argType = TYPE_INT;
-                }
-                if (!argType.isSameType(paramType)) {
-                    // Implement type casting
-                    final String synthName = argType + "_" + paramType;
-                    switch (synthName) {
-                        case "byte_int":        val = applyRegisterTransfer(val, Operation.CONV_BYTE_INT); break;
-                        case "short_int":       val = applyRegisterTransfer(val, Operation.CONV_SHORT_INT); break;
-                        case "long_int":        val = applyRegisterTransfer(val, Operation.CONV_LONG_INT); break;
-                        case "int_byte":        val = applyRegisterTransfer(val, Operation.CONV_INT_BYTE); break;
-                        case "int_short":       val = applyRegisterTransfer(val, Operation.CONV_INT_SHORT); break;
-                        case "int_long":        val = applyRegisterTransfer(val, Operation.CONV_INT_LONG); break;
-                        case "int_float":       val = applyRegisterTransfer(val, Operation.CONV_INT_FLOAT); break;
-                        case "long_float":      val = applyRegisterTransfer(val, Operation.CONV_LONG_FLOAT); break;
-                        case "int_double":      val = applyRegisterTransfer(val, Operation.CONV_INT_DOUBLE); break;
-                        case "long_double":     val = applyRegisterTransfer(val, Operation.CONV_LONG_DOUBLE); break;
-                        case "float_double":    val = applyRegisterTransfer(val, Operation.CONV_FLOAT_DOUBLE); break;
-                        default:
-                            throw new AssertionError("Unknown conversion rule: " + synthName);
-                    }
-                }
+            if (ftype != null) {
+                val = insertConversion(val, argType, (paramType = ftype.params[i]));
             }
             final Statement stmt = new Statement(Operation.PUSH_PARAM, val);
             stmt.setDataSize(paramType.getSize());
@@ -797,11 +804,11 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
             throw new IncompatibleTypeException(valueType, declType);
         }
 
-        // TODO: Insert type conversions here!
         boolean validMove = false;
         if (dummyValue instanceof Register && !dummyValue.isTemporary()) {
             validMove = true;
-            final Statement stmt = new Statement(Operation.STORE_VAR, VALUE_STACK.pop(), dummyValue);
+            final Value convertedValue = insertConversion(VALUE_STACK.pop(), valueType, declType);
+            final Statement stmt = new Statement(Operation.STORE_VAR, convertedValue, dummyValue);
             stmt.setDataSize(valueType.getSize());
             funcStmts.add(stmt);
             // Keep the register on the stack
@@ -809,9 +816,11 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
         } else if (lastInstr != null && lastInstr.op == Operation.GET_ATTR) {
             // R1 <- GET_ATTR R0, attr  ; new PUT_ATTR is the same (R1 is used as new value)
             validMove = true;
-            final Statement stmt = new Statement(Operation.PUT_ATTR, lastInstr.lhs, lastInstr.rhs, VALUE_STACK.peek());
+            final Value convertedValue = insertConversion(VALUE_STACK.pop(), valueType, declType);
+            final Statement stmt = new Statement(Operation.PUT_ATTR, lastInstr.lhs, lastInstr.rhs, convertedValue);
             stmt.setDataSize(valueType.getSize());
             funcStmts.add(stmt);
+            VALUE_STACK.push(convertedValue);
         }
 
         if (!validMove) {
