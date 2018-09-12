@@ -13,6 +13,14 @@ public final class FuncType implements Type {
     }
 
     @Override
+    public int getSize() {
+        // This is very wrong and non-portable.
+        // But that is what the C compiler on
+        // my local machine tells me :-)
+        return 64;
+    }
+
+    @Override
     public String toString() {
         return Arrays.toString(params) + " -> " + ret;
     }

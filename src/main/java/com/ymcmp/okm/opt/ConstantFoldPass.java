@@ -81,13 +81,15 @@ public final class ConstantFoldPass implements Pass {
                     case CONV_INT_LONG:
                     case CONV_FLOAT_DOUBLE:
                         if (safeIsNumeric(stmt.lhs)) {
-                            final Value newValue = ((Fixnum) stmt.lhs).changeSize(getResultSize(stmt.op));
+                            final int newSize = getResultSize(stmt.op);
+                            final Value newValue = ((Fixnum) stmt.lhs).changeSize(newSize);
                             replacement.put(stmt.dst.toString(), newValue);
                             final Statement newStmt;
                             if (stmt.dst.isTemporary()) {
                                 newStmt = new Statement(Operation.NOP);
                             } else {
                                 newStmt = new Statement(Operation.LOAD_NUMERAL, newValue, stmt.dst);
+                                newStmt.setDataSize(newSize);
                             }
                             block.set(i--, newStmt);
                             continue;
@@ -98,13 +100,15 @@ public final class ConstantFoldPass implements Pass {
                     case CONV_INT_DOUBLE:
                     case CONV_LONG_DOUBLE:
                         if (safeIsNumeric(stmt.lhs)) {
-                            final Value newValue = new Fixnum(((Fixnum) stmt.lhs).value + ".0", getResultSize(stmt.op));
+                            final int newSize = getResultSize(stmt.op);
+                            final Value newValue = new Fixnum(((Fixnum) stmt.lhs).value + ".0", newSize);
                             replacement.put(stmt.dst.toString(), newValue);
                             final Statement newStmt;
                             if (stmt.dst.isTemporary()) {
                                 newStmt = new Statement(Operation.NOP);
                             } else {
                                 newStmt = new Statement(Operation.LOAD_NUMERAL, newValue, stmt.dst);
+                                newStmt.setDataSize(newSize);
                             }
                             block.set(i--, newStmt);
                             continue;
@@ -128,7 +132,9 @@ public final class ConstantFoldPass implements Pass {
                     if (replacement.containsKey(safeToString(stmt.dst))) {
                         if (stmt.op.readsFromDst()) {
                             final Value newDst = replacement.get(stmt.dst.toString());
-                            block.set(i--, new Statement(stmt.op, stmt.lhs, stmt.rhs, newDst));
+                            final Statement repl = new Statement(stmt.op, stmt.lhs, stmt.rhs, newDst);
+                            repl.setDataSize(stmt.getDataSize());
+                            block.set(i--, repl);
                             continue;
                         }
                         // This block will undo the previous substitution
@@ -147,7 +153,9 @@ public final class ConstantFoldPass implements Pass {
                     // Convert to LOAD_NUMERAL
                     op = Operation.LOAD_NUMERAL;
                 }
-                block.set(i--, new Statement(op, newLhs, newRhs, stmt.dst));
+                final Statement repl = new Statement(op, newLhs, newRhs, stmt.dst);
+                repl.setDataSize(stmt.getDataSize());
+                block.set(i--, repl);
                 continue;
             }
 
@@ -171,7 +179,9 @@ public final class ConstantFoldPass implements Pass {
                             continue;
                     }
                     final int newSize = lhs.size < rhs.size ? rhs.size : lhs.size;
-                    block.set(i--, new Statement(Operation.LOAD_NUMERAL, new Fixnum(result, newSize), stmt.dst));
+                    final Statement repl = new Statement(Operation.LOAD_NUMERAL, new Fixnum(result, newSize), stmt.dst);
+                    repl.setDataSize(newSize);
+                    block.set(i--, repl);
                 }
                 continue;
             }
@@ -188,7 +198,9 @@ public final class ConstantFoldPass implements Pass {
                             // Not optimizable, not an error, just ignore
                             continue;
                     }
-                    block.set(i--, new Statement(Operation.LOAD_NUMERAL, new Fixnum(result, lhs.size), stmt.dst));
+                    final Statement repl = new Statement(Operation.LOAD_NUMERAL, new Fixnum(result, lhs.size), stmt.dst);
+                    repl.setDataSize(lhs.size);
+                    block.set(i--, repl);
                 }
                 continue;
             }

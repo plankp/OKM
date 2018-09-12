@@ -34,6 +34,22 @@ public final class UnaryType implements Type {
     }
 
     @Override
+    public int getSize() {
+        switch (name) {
+            case "unit":    // Unit has a size, because you could pass in unit as a argument!
+            case "bool":
+            case "byte":    return 8;
+            case "short":   return 16;
+            case "int":     return 32;
+            case "long":    return 64;
+            case "float":   return 32;
+            case "double":  return 64;
+            default:
+                throw new AssertionError("Unknown size of type " + name);
+        }
+    }
+
+    @Override
     public String toString() {
         return name;
     }

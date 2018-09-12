@@ -36,8 +36,8 @@ public final class Scope implements Serializable {
         this.locals.pop();
     }
 
-    public Set<String> getCurrentLocals() {
-        return locals.peek().keySet();
+    public Set<Map.Entry<String, Type>> getCurrentLocals() {
+        return locals.peek().entrySet();
     }
 
     public void put(String name, Type type) {

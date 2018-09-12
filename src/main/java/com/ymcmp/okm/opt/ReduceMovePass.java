@@ -26,7 +26,9 @@ public final class ReduceMovePass implements Pass {
                 if (stmt.dst.isTemporary()) {
                     block.set(i + 1, new Statement(Operation.NOP));
                     // Convert the CALL statement's dst to STORE_VAR statement's
-                    block.set(i--, new Statement(stmt.op, stmt.lhs, stmt.rhs, next.dst));
+                    final Statement repl = new Statement(stmt.op, stmt.lhs, stmt.rhs, next.dst);
+                    repl.setDataSize(stmt.getDataSize());
+                    block.set(i--, repl);
                     continue;
                 }
             }

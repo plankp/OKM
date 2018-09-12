@@ -2,6 +2,8 @@ package com.ymcmp.okm.type;
 
 public interface Type {
 
+    public int getSize();
+
     public boolean isSameType(Type t);
 
     public default boolean canConvertTo(Type t) {

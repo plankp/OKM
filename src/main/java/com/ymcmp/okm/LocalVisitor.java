@@ -136,8 +136,11 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
         // Perform pre-initialization (such as setting up enums)
         initializer.addAll(PRE_INIT_STMTS);
         // Initializes all included modules
+        final Register dummyRegister = Register.makeTemporary();
         for (final String func : MODULE_INITS) {
-            initializer.add(new Statement(Operation.CALL, Register.makeNamed(func), Register.makeTemporary()));
+            final Statement stmt = new Statement(Operation.CALL, Register.makeNamed(func), dummyRegister);
+            stmt.setDataSize(UnaryType.getType("unit").getSize());
+            initializer.add(stmt);
         }
         // Use RETURN_UNIT
         initializer.add(new Statement(Operation.RETURN_UNIT));
@@ -205,9 +208,11 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
             funcStmts = new ArrayList<>();
 
             // Callee retrieves arguments
-            for (final String param : currentScope.getCurrentLocals()) {
-                final Register slot = Register.makeNamed(currentScope.getProcessedName(NAMING_STRAT, param));
-                funcStmts.add(new Statement(Operation.POP_PARAM, slot));
+            for (final Map.Entry<String, Type> param : currentScope.getCurrentLocals()) {
+                final Register slot = Register.makeNamed(currentScope.getProcessedName(NAMING_STRAT, param.getKey()));
+                final Statement stmt = new Statement(Operation.POP_PARAM, slot);
+                stmt.setDataSize(param.getValue().getSize());
+                funcStmts.add(stmt);
             }
 
             // Process function body here
@@ -590,7 +595,12 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
         final Type valueType = (Type) visit(ctx.value);
         currentScope.put(name, valueType);
 
-        funcStmts.add(new Statement(Operation.STORE_VAR, VALUE_STACK.pop(), Register.makeNamed(currentScope.getProcessedName(NAMING_STRAT, name))));
+        final Statement stmt = new Statement(
+                Operation.STORE_VAR,
+                VALUE_STACK.pop(),
+                Register.makeNamed(currentScope.getProcessedName(NAMING_STRAT, name)));
+        stmt.setDataSize(valueType.getSize());
+        funcStmts.add(stmt);
 
         LOGGER.info("Declare and assign type " + valueType + " to " + name);
         return null;
@@ -723,10 +733,14 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
                     }
                 }
             }
-            funcStmts.add(new Statement(Operation.PUSH_PARAM, val));
+            final Statement stmt = new Statement(Operation.PUSH_PARAM, val);
+            stmt.setDataSize(paramType.getSize());
+            funcStmts.add(stmt);
         }
         final Register temporary = Register.makeTemporary();
-        funcStmts.add(new Statement(Operation.CALL, VALUE_STACK.pop(), temporary));
+        final Statement stmt = new Statement(Operation.CALL, VALUE_STACK.pop(), temporary);
+        stmt.setDataSize(result.getSize());
+        funcStmts.add(stmt);
         VALUE_STACK.push(temporary);
 
         LOGGER.info("Call to type " + base + " yields " + result);
@@ -745,7 +759,9 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
         funcStmts.add(new Statement(Operation.JUMP_IF_TRUE, VALUE_STACK.pop(), brTrue));
 
         final Type b = (Type) visit(ctx.brFalse);
-        funcStmts.add(new Statement(Operation.STORE_VAR, VALUE_STACK.pop(), temporary));
+        final Statement stmtB = new Statement(Operation.STORE_VAR, VALUE_STACK.pop(), temporary);
+        stmtB.setDataSize(b.getSize());
+        funcStmts.add(stmtB);
 
         final Label brEnd = new Label();
         funcStmts.add(new Statement(Operation.GOTO, brEnd));
@@ -753,7 +769,9 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
         brTrue.setAddress(funcStmts.size());
 
         final Type a = (Type) visit(ctx.brTrue);
-        funcStmts.add(new Statement(Operation.STORE_VAR, VALUE_STACK.pop(), temporary));
+        final Statement stmtA = new Statement(Operation.STORE_VAR, VALUE_STACK.pop(), temporary);
+        stmtA.setDataSize(a.getSize());
+        funcStmts.add(stmtA);
 
         brEnd.setAddress(funcStmts.size());
 
@@ -779,16 +797,21 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
             throw new IncompatibleTypeException(valueType, declType);
         }
 
+        // TODO: Insert type conversions here!
         boolean validMove = false;
         if (dummyValue instanceof Register && !dummyValue.isTemporary()) {
             validMove = true;
-            funcStmts.add(new Statement(Operation.STORE_VAR, VALUE_STACK.pop(), dummyValue));
+            final Statement stmt = new Statement(Operation.STORE_VAR, VALUE_STACK.pop(), dummyValue);
+            stmt.setDataSize(valueType.getSize());
+            funcStmts.add(stmt);
             // Keep the register on the stack
             VALUE_STACK.push(dummyValue);
         } else if (lastInstr != null && lastInstr.op == Operation.GET_ATTR) {
             // R1 <- GET_ATTR R0, attr  ; new PUT_ATTR is the same (R1 is used as new value)
             validMove = true;
-            funcStmts.add(new Statement(Operation.PUT_ATTR, lastInstr.lhs, lastInstr.rhs, VALUE_STACK.peek()));
+            final Statement stmt = new Statement(Operation.PUT_ATTR, lastInstr.lhs, lastInstr.rhs, VALUE_STACK.peek());
+            stmt.setDataSize(valueType.getSize());
+            funcStmts.add(stmt);
         }
 
         if (!validMove) {
@@ -1086,10 +1109,12 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
         final Register temporary = Register.makeTemporary();
 
         LOGGER.info(base + "." + attr + " yields " + result);
-        funcStmts.add(new Statement(
+        final Statement stmt = new Statement(
                 base instanceof EnumType ? Operation.LOAD_ENUM_KEY : Operation.GET_ATTR,
                 VALUE_STACK.pop(),
-                Register.makeNamed(attr), temporary));
+                Register.makeNamed(attr), temporary);
+        stmt.setDataSize(result.getSize());
+        funcStmts.add(stmt);
         VALUE_STACK.push(temporary);
         return result;
     }
@@ -1172,11 +1197,14 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
         final String text = ctx.getText();
 
         final Register temporary = Register.makeTemporary();
-        funcStmts.add(new Statement("true".equals(text) ? Operation.LOAD_TRUE : Operation.LOAD_FALSE, temporary));
+        final Type t = UnaryType.getType("bool");
+        final Statement stmt = new Statement("true".equals(text) ? Operation.LOAD_TRUE : Operation.LOAD_FALSE, temporary);
+        stmt.setDataSize(t.getSize());
+        funcStmts.add(stmt);
         VALUE_STACK.push(temporary);
 
         LOGGER.info("Literal " + text + " is a bool");
-        return UnaryType.getType("bool");
+        return t;
     }
 
     @Override
@@ -1208,12 +1236,15 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
             }
         }
 
+        final Type t = UnaryType.getType(typeName);
         final Register temporary = Register.makeTemporary();
-        funcStmts.add(new Statement(Operation.LOAD_NUMERAL, new Fixnum(text, size), temporary));
+        final Statement stmt = new Statement(Operation.LOAD_NUMERAL, new Fixnum(text, size), temporary);
+        stmt.setDataSize(t.getSize());
+        funcStmts.add(stmt);
         VALUE_STACK.push(temporary);
 
         LOGGER.info("Literal " + text + " is a " + typeName);
-        return UnaryType.getType(typeName);
+        return t;
     }
 
     @Override
@@ -1226,10 +1257,12 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
         if (ent.isType && ent.type instanceof StructType) {
             final StructType newData = ((StructType) ent.type).allocate();
             final Register temp = Register.makeTemporary();
-            funcStmts.add(new Statement(
+            final Statement stmt = new Statement(
                     Operation.ALLOC_STRUCT,
                     Register.makeNamed(currentScope.getProcessedName(NAMING_STRAT, structName)),
-                    temp));
+                    temp);
+            stmt.setDataSize(newData.getSize());
+            funcStmts.add(stmt);
             VALUE_STACK.push(temp);
             return newData;
         }

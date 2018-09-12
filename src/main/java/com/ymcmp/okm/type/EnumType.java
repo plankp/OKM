@@ -22,6 +22,12 @@ public final class EnumType implements Type {
         return new EnumType(name);
     }
 
+    @Override
+    public int getSize() {
+        // Must be same as EnumKeyType's size
+        return 32;
+    }
+
     public String[] getKeys() {
         return KEYS.get(name);
     }

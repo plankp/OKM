@@ -11,6 +11,8 @@ public final class Statement implements Serializable {
     public final Value rhs;
     public final Value dst;
 
+    private int dataSize;
+
     public Statement(Operation op) {
         this(op, null, null, null);
     }
@@ -30,11 +32,21 @@ public final class Statement implements Serializable {
         this.dst = dst;
     }
 
+    public void setDataSize(int size) {
+        this.dataSize = size;
+    }
+
+    public int getDataSize() {
+        return this.dataSize;
+    }
+
     @Override
     public String toString() {
-        return dst == null ? op.toString()
-             : lhs == null ? op + " " + dst
-             : rhs == null ? op + " " + dst + ", " + lhs
-             : op + " " + dst + ", " + lhs + ", " + rhs;
+        final StringBuilder sb = new StringBuilder().append(op);
+        if (dataSize > 0)   sb.append(':').append(dataSize / Byte.SIZE);
+        if (dst != null)    sb.append(' ').append(dst);
+        if (lhs != null)    sb.append(',').append(lhs);
+        if (rhs != null)    sb.append(',').append(rhs);
+        return sb.toString();
     }
 }

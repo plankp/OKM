@@ -29,6 +29,13 @@ public final class StructType implements Type {
         return new StructType(name, fields, true);
     }
 
+    @Override
+    public int getSize() {
+        return fields.values().stream()
+                .mapToInt(Type::getSize)
+                .sum();
+    }
+
     public void putField(String name, Type type) {
         if (fields.containsKey(name)) {
             throw new DuplicateSymbolException(name);

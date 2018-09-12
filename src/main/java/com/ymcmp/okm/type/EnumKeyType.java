@@ -15,6 +15,12 @@ public final class EnumKeyType implements Type {
     }
 
     @Override
+    public int getSize() {
+        // Must be same as EnumType's size
+        return 32;
+    }
+
+    @Override
     public boolean isSameType(Type t) {
         if (t instanceof EnumType) {
             return name.equals(((EnumType) t).name);
