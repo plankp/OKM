@@ -159,6 +159,8 @@ public final class ConstantFoldPass implements Pass {
                 if (lhs.isInt && rhs.isInt) {
                     final long a = Long.parseLong(lhs.value);
                     final long b = Long.parseLong(rhs.value);
+                    int newSize = lhs.size < rhs.size ? rhs.size : lhs.size;
+
                     final long result;
                     switch (stmt.op) {
                         case INT_ADD: case LONG_ADD: result = a + b; break;
@@ -166,11 +168,17 @@ public final class ConstantFoldPass implements Pass {
                         case INT_MUL: case LONG_MUL: result = a * b; break;
                         case INT_DIV: case LONG_DIV: result = a / b; break;
                         case INT_MOD: case LONG_MOD: result = a % b; break;
+                        case INT_LT:   newSize = Byte.SIZE; result = a < b ? 1 : 0; break;
+                        case INT_GT:   newSize = Byte.SIZE; result = a > b ? 1 : 0; break;
+                        case INT_LE:   newSize = Byte.SIZE; result = a <= b ? 1 : 0; break;
+                        case INT_GE:   newSize = Byte.SIZE; result = a <= b ? 1 : 0; break;
+                        case INT_EQ:   newSize = Byte.SIZE; result = a == b ? 1 : 0; break;
+                        case INT_NE:   newSize = Byte.SIZE; result = a != b ? 1 : 0; break;
+                        case LONG_CMP: newSize = Byte.SIZE; result = Long.compare(a, b); break;
                         default:
                             // Not optimizable, not an error, just ignore
                             continue;
                     }
-                    final int newSize = lhs.size < rhs.size ? rhs.size : lhs.size;
                     final Statement repl = new Statement(Operation.LOAD_NUMERAL, new Fixnum(result, newSize), stmt.dst);
                     repl.setDataSize(newSize);
                     block.set(i--, repl);
