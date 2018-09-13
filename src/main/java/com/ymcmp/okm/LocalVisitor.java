@@ -709,14 +709,12 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
                 }
 
                 if (src instanceof Pointer) {
-                    // DEREFER first
-                    // final List<Operation> convSeq = new ArrayList<>();
+                    // POINTER_GET first
                     Type newSrc = src;
                     while (newSrc instanceof Pointer) {
                         newSrc = ((Pointer) newSrc).inner;
-                        // convSeq.add(Operation.DEREFER);
                         final Register tmp = Register.makeTemporary();
-                        final Statement derefStmt = new Statement(Operation.DEREFER, val, tmp);
+                        final Statement derefStmt = new Statement(Operation.POINTER_GET, val, tmp);
                         derefStmt.setDataSize(newSrc.getSize());
                         funcStmts.add(derefStmt);
                         val = tmp;
@@ -865,14 +863,39 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
             funcStmts.add(stmt);
             // Keep the register on the stack
             VALUE_STACK.push(dummyValue);
-        } else if (lastInstr != null && lastInstr.op == Operation.GET_ATTR) {
-            // R1 <- GET_ATTR R0, attr  ; new PUT_ATTR is the same (R1 is used as new value)
-            validMove = true;
-            final Value convertedValue = insertConversion(VALUE_STACK.pop(), valueType, declType);
-            final Statement stmt = new Statement(Operation.PUT_ATTR, lastInstr.lhs, lastInstr.rhs, convertedValue);
-            stmt.setDataSize(valueType.getSize());
-            funcStmts.add(stmt);
-            VALUE_STACK.push(convertedValue);
+        } else if (lastInstr != null) {
+            switch (lastInstr.op) {
+                case GET_ATTR: {
+                    // R1 <- GET_ATTR R0, attr  ; new PUT_ATTR is the same (R1 is used as new value)
+                    validMove = true;
+                    final Value convertedValue = insertConversion(VALUE_STACK.pop(), valueType, declType);
+                    final Statement stmt = new Statement(Operation.PUT_ATTR, lastInstr.lhs, lastInstr.rhs, convertedValue);
+                    stmt.setDataSize(valueType.getSize());
+                    funcStmts.add(stmt);
+                    VALUE_STACK.push(convertedValue);
+                    break;
+                }
+                case DEREF_GET_ATTR: {
+                    // R1 <- DEREF_GET_ATTR R0, attr ; new DEREF_PUT_ATTR is the same (R1 is used as new value)
+                    validMove = true;
+                    final Value convertedValue = insertConversion(VALUE_STACK.pop(), valueType, declType);
+                    final Statement stmt = new Statement(Operation.DEREF_PUT_ATTR, lastInstr.lhs, lastInstr.rhs, convertedValue);
+                    stmt.setDataSize(valueType.getSize());
+                    funcStmts.add(stmt);
+                    VALUE_STACK.push(convertedValue);
+                    break;
+                }
+                case POINTER_GET: {
+                    // R1 <- POINTER_GET R0
+                    validMove = true;
+                    final Value convertedValue = insertConversion(VALUE_STACK.pop(), valueType, declType);
+                    final Statement stmt = new Statement(Operation.POINTER_PUT, convertedValue, lastInstr.lhs);
+                    stmt.setDataSize(valueType.getSize());
+                    funcStmts.add(stmt);
+                    VALUE_STACK.push(convertedValue);
+                    break;
+                }
+            }
         }
 
         if (!validMove) {
@@ -1163,6 +1186,7 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
         final String attr = ctx.attr.getText();
         final Type base = (Type) visit(ctx.base);
 
+        boolean isPointer = false;
         Type result = base.tryAccessAttribute(attr);
         if (result == null) {
             // It might be a pointer. in which case we un-pointer it
@@ -1170,18 +1194,20 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
             Value ptr = null;
             block: {
                 if (base instanceof Pointer) {
+                    isPointer = true;
                     ptr = VALUE_STACK.pop();
                     Type newBase = base;
                     while (newBase instanceof Pointer) {
                         newBase = ((Pointer) newBase).inner;
-                        final Register temp = Register.makeTemporary();
-                        final Statement deref = new Statement(Operation.DEREFER, ptr, temp);
-                        deref.setDataSize(newBase.getSize());
-                        funcStmts.add(deref);
-                        ptr = temp;
                         if ((result = newBase.tryAccessAttribute(attr)) != null) {
                             break block;
                         }
+
+                        final Register temp = Register.makeTemporary();
+                        final Statement deref = new Statement(Operation.POINTER_GET, ptr, temp);
+                        deref.setDataSize(newBase.getSize());
+                        funcStmts.add(deref);
+                        ptr = temp;
                     }
                     throw new UndefinedOperationException("Type " + newBase + " does not allow accessing attribute " + attr);
                 }
@@ -1207,7 +1233,11 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
                 }
                 throw new AssertionError("Unkown enum key of " + attr + " in type " + enumBase);
             }
-            stmt = new Statement(Operation.GET_ATTR, VALUE_STACK.pop(), Register.makeNamed(attr), temporary);
+            stmt = new Statement(
+                    isPointer ? Operation.DEREF_GET_ATTR : Operation.GET_ATTR,
+                    VALUE_STACK.pop(),
+                    Register.makeNamed(attr),
+                    temporary);
         }
         stmt.setDataSize(result.getSize());
         funcStmts.add(stmt);
@@ -1241,7 +1271,7 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
 
         final Operation[] baseSeq = convertSeqToLong(base);
 
-        if (base != null) {
+        if (baseSeq != null) {
             boolean useLong = true;
             if (baseSeq[baseSeq.length - 1] == Operation.CONV_INT_LONG) {
                 // Convert to int is enough
@@ -1259,6 +1289,10 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
 
             // Downcast back to actual type is necessary
             cleanupSeq = uncastLongSequence(useLong, result);
+        }
+
+        if (op == UnaryOperator.TILDA && base instanceof Pointer) {
+            opcode = Operation.POINTER_GET;
         }
 
         if (opcode == null) {

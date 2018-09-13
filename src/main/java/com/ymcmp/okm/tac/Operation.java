@@ -73,7 +73,12 @@ public enum Operation {
 
     REFER_VAR,
     REFER_ATTR,
-    DEREFER,
+
+    POINTER_GET,
+    POINTER_PUT,
+
+    DEREF_GET_ATTR,
+    DEREF_PUT_ATTR,
 
     ALLOC_STRUCT,
 
@@ -110,6 +115,7 @@ public enum Operation {
         switch (this) {
             case PUSH_PARAM:
             case PUT_ATTR:
+            case DEREF_PUT_ATTR:
             case RETURN_VALUE:
                 return true;
             default:
@@ -136,7 +142,8 @@ public enum Operation {
             case STORE_VAR:
             case REFER_VAR:
             case REFER_ATTR:
-            case DEREFER:
+            case POINTER_PUT:
+            case DEREF_PUT_ATTR:
             case PUSH_PARAM:
             case POP_PARAM:
             case PUT_ATTR:

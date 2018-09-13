@@ -42,6 +42,9 @@ public final class Pointer implements Type {
     @Override
     public Type tryPerformUnary(UnaryOperator op) {
         // Unlike in C, no pointer arithemetic
+        if (op == UnaryOperator.TILDA) {
+            return inner;
+        }
         return null;
     }
 

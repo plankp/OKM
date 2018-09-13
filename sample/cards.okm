@@ -58,15 +58,8 @@ unit cards () {
     suit_of_card = Suit.CLUBS
     println(b: ace_of_spades.suit != Suit.CLUBS)
 
-    # Store pointers to struct fields
-    # Useful when you have field of structs inside other struct
-    suit_of_card = &ace_of_spades.suit
-
-    # # The commented out line does not mutate the pointer
-    # # Hence the previous *Useful when...* line
-    # suit_of_card = Suit.CLUBS
-
-    # Although you could use pointer as a View-handle
-    ace_of_spades.suit = Suit.SPADES
-    println(b: suit_of_card == Suit.SPADES)
+    # Modify the suit via a pointer
+    ptr_to_suit := &ace_of_spades.suit
+    ~ptr_to_suit = Suit.CLUBS           # the equivalent of *ptr = value in C
+    println(b: ace_of_spades.suit == Suit.CLUBS)
 }
