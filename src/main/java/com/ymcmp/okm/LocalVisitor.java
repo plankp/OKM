@@ -875,8 +875,9 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
             throw new UndefinedOperationException("Bad storage pointer of " + value.getText());
         }
         VALUE_STACK.push(temporary);
-        LOGGER.info("Create reference to type " + valueType);
-        return valueType;
+        final Pointer ptr = new Pointer(valueType);
+        LOGGER.info("Create " + ptr);
+        return ptr;
     }
 
     @Override
