@@ -530,7 +530,6 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
         LOGGER.info("Declare " + currentVisibility + " " + type + " with keys " + Arrays.toString(keys));
         final Module.Entry entry = Module.Entry.newType(currentVisibility, type, currentFile);
         currentModule.put(name, entry);
-        PRE_INIT_STMTS.add(new Statement(Operation.LOAD_ENUM, new EnumKeys(keys), Register.makeNamed(NAMING_STRAT.name(entry, name))));
         return null;
     }
 
@@ -1145,10 +1144,21 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
         final Register temporary = Register.makeTemporary();
 
         LOGGER.info(base + "." + attr + " yields " + result);
-        final Statement stmt = new Statement(
-                base instanceof EnumType ? Operation.LOAD_ENUM_KEY : Operation.GET_ATTR,
-                VALUE_STACK.pop(),
-                Register.makeNamed(attr), temporary);
+        final Statement stmt;
+        block: {
+            if (base instanceof EnumType) {
+                final EnumType enumBase = (EnumType) base;
+                final String[] keys = enumBase.getKeys();
+                for (int ordinal = 0; ordinal < keys.length; ++ordinal) {
+                    if (attr.equals(keys[ordinal])) {
+                        stmt = new Statement(Operation.LOAD_NUMERAL, new Fixnum(ordinal, Integer.SIZE), temporary);
+                        break block;
+                    }
+                }
+                throw new AssertionError("Unkown enum key of " + attr + " in type " + enumBase);
+            }
+            stmt = new Statement(Operation.GET_ATTR, VALUE_STACK.pop(), Register.makeNamed(attr), temporary);
+        }
         stmt.setDataSize(result.getSize());
         funcStmts.add(stmt);
         VALUE_STACK.push(temporary);
@@ -1223,7 +1233,9 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
             throw new UndefinedSymbolException(symbol);
         }
 
-        VALUE_STACK.push(Register.makeNamed(currentScope.getProcessedName(NAMING_STRAT, symbol)));
+        if (!(symType instanceof EnumType)) {
+            VALUE_STACK.push(Register.makeNamed(currentScope.getProcessedName(NAMING_STRAT, symbol)));
+        }
 
         return symType;
     }
