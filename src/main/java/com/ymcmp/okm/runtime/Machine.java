@@ -235,16 +235,16 @@ public class Machine {
                         break;
                     }
                     case POINTER_GET:   // POINTER_GET      dst:store, lhs:pointer
-                        locals.put(stmt.dst, ((Mutable) fetchValue(stmt.lhs, false)).getValue());
+                        locals.put(stmt.dst, ((Mutable) fetchValue(stmt.lhs)).getValue());
                         break;
                     case POINTER_PUT:   // POINTER_PUT      dst:pointer, lhs:value
-                        ((Mutable) fetchValue(stmt.dst, false)).setValue(fetchValue(stmt.lhs));
+                        ((Mutable) fetchValue(stmt.dst)).setValue(fetchValue(stmt.lhs));
                         break;
                     case DEREF_GET_ATTR: //                 dst:store, lhs:pointer to struct, rhs:attr
-                        locals.put(stmt.dst, ((StructFields) ((Mutable) fetchValue(stmt.lhs, false)).getValue()).get(stmt.rhs.toString()));
+                        locals.put(stmt.dst, ((StructFields) ((Mutable) fetchValue(stmt.lhs)).getValue()).get(stmt.rhs.toString()));
                         break;
                     case DEREF_PUT_ATTR: //                 dst:value, lhs:pointer to struct, rhs:attr
-                        ((StructFields) ((Mutable) fetchValue(stmt.lhs, false)).getValue()).put(stmt.rhs.toString(), fetchValue(stmt.dst));
+                        ((StructFields) ((Mutable) fetchValue(stmt.lhs)).getValue()).put(stmt.rhs.toString(), fetchValue(stmt.dst));
                         break;
                     case ALLOC_STRUCT:  // ALLOC_STRUCT     dst:store, lhs:size of struct (we ignore this)
                         locals.put(stmt.dst, new StructFields());
@@ -277,7 +277,7 @@ public class Machine {
                         break;
                     case PUSH_PARAM:    // PUSH_PARAM       dst:value
                         // Pass by value, (including structs)
-                        callStack.push(fetchValue(stmt.dst, false).duplicate());
+                        callStack.push(fetchValue(stmt.dst).duplicate());
                         break;
                     case CALL:          // CALL             dst:store, lhs:callsite
                         locals.put(stmt.dst, execute(code, fetchValue(stmt.lhs).toString()));
@@ -307,15 +307,7 @@ public class Machine {
     }
 
     private Value fetchValue(final Value val) {
-        return fetchValue(val, true);
-    }
-
-    private Value fetchValue(final Value val, final boolean resolveRef) {
-        final Value v = locals.getOrDefault(val, val);
-        if (resolveRef && v instanceof Mutable) {
-            return ((Mutable) v).getValue();
-        }
-        return v;
+        return locals.getOrDefault(val, val);
     }
 
     private static Fixnum makeBool(final boolean b) {
