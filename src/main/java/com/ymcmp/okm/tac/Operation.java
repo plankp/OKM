@@ -137,6 +137,17 @@ public enum Operation {
         }
     }
 
+    public boolean branchesToAddress() {
+        switch (this) {
+            case GOTO:
+            case JUMP_IF_TRUE:
+            case JUMP_IF_FALSE:
+                return true;
+            default:
+                return false;
+        }
+    }
+
     public boolean hasPotentialSideEffects() {
         switch (this) {
             case STORE_VAR:
