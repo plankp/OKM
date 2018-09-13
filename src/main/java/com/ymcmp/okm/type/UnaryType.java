@@ -34,6 +34,11 @@ public final class UnaryType implements Type {
     }
 
     @Override
+    public UnaryType allocate() {
+        return this;
+    }
+
+    @Override
     public int getSize() {
         switch (name) {
             case "unit":    // Unit has a size, because you could pass in unit as a argument!

@@ -406,16 +406,19 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
 
     @Override
     public Type visitType(TypeContext ctx) {
-        final String name = ctx.getText();
-        final Module.Entry ent = currentModule.get(name);
-        if (ent != null && ent.isType) {
-            final Type t = ent.type;
-            if (t instanceof EnumType) {
-                return ((EnumType) t).createCorrespondingKey();
+        if (ctx.inner == null) {
+            final String name = ctx.getText();
+            final Module.Entry ent = currentModule.get(name);
+            if (ent != null && ent.isType) {
+                final Type t = ent.type;
+                if (t instanceof EnumType) {
+                    return ((EnumType) t).createCorrespondingKey();
+                }
+                return t;
             }
-            return t;
+            throw new UndefinedOperationException(name + " does not name a type");
         }
-        throw new UndefinedOperationException(name + " does not name a type");
+        return new Pointer(visitType(ctx.inner));
     }
 
     @Override
@@ -423,7 +426,7 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
         final List<Tuple<String, Type>> list = new ArrayList<>();
         final Type type = visitType(ctx.t);
         for (int i = 0; i < ctx.getChildCount() - 2; i += 2) {
-            list.add(new Tuple<>(ctx.getChild(i).getText(), type instanceof StructType ? ((StructType) type).allocate() : type));
+            list.add(new Tuple<>(ctx.getChild(i).getText(), type.allocate()));
         }
         return list;
     }
@@ -695,13 +698,35 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
         return performCall(callable, args);
     }
 
-    private Value insertConversion(final Value val, Type src, Type dst) {
-        if (!src.isSameType(dst)) {
-            if (src instanceof EnumKeyType) {
-                // hack: we redo the above routine as if src was int
-                src = TYPE_INT;
-            }
+    private Value insertConversion(Value val, Type src, Type dst) {
+        // Since java does not support tailcalls and probably never will,
+        // we will hack one in here (its only self-recursing anyway)
+        tailcall: while (true) {
             if (!src.isSameType(dst)) {
+                if (src instanceof EnumKeyType) {
+                    src = TYPE_INT;
+                    continue tailcall;
+                }
+
+                if (src instanceof Pointer) {
+                    // POINTER_GET first
+                    Type newSrc = src;
+                    while (newSrc instanceof Pointer) {
+                        newSrc = ((Pointer) newSrc).inner;
+                        final Register tmp = Register.makeTemporary();
+                        final Statement derefStmt = new Statement(Operation.POINTER_GET, val, tmp);
+                        derefStmt.setDataSize(newSrc.getSize());
+                        funcStmts.add(derefStmt);
+                        val = tmp;
+                        if (newSrc.isSameType(dst)) {
+                            return val;
+                        }
+                    }
+
+                    src = newSrc;
+                    continue tailcall;
+                }
+
                 // Implement type casting
                 final String synthName = src + "_" + dst;
                 switch (synthName) {
@@ -720,8 +745,8 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
                         throw new AssertionError("Unknown conversion rule: " + synthName);
                 }
             }
+            return val;
         }
-        return val;
     }
 
     private Type performCall(Type base, Type... args) {
@@ -838,14 +863,39 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
             funcStmts.add(stmt);
             // Keep the register on the stack
             VALUE_STACK.push(dummyValue);
-        } else if (lastInstr != null && lastInstr.op == Operation.GET_ATTR) {
-            // R1 <- GET_ATTR R0, attr  ; new PUT_ATTR is the same (R1 is used as new value)
-            validMove = true;
-            final Value convertedValue = insertConversion(VALUE_STACK.pop(), valueType, declType);
-            final Statement stmt = new Statement(Operation.PUT_ATTR, lastInstr.lhs, lastInstr.rhs, convertedValue);
-            stmt.setDataSize(valueType.getSize());
-            funcStmts.add(stmt);
-            VALUE_STACK.push(convertedValue);
+        } else if (lastInstr != null) {
+            switch (lastInstr.op) {
+                case GET_ATTR: {
+                    // R1 <- GET_ATTR R0, attr  ; new PUT_ATTR is the same (R1 is used as new value)
+                    validMove = true;
+                    final Value convertedValue = insertConversion(VALUE_STACK.pop(), valueType, declType);
+                    final Statement stmt = new Statement(Operation.PUT_ATTR, lastInstr.lhs, lastInstr.rhs, convertedValue);
+                    stmt.setDataSize(valueType.getSize());
+                    funcStmts.add(stmt);
+                    VALUE_STACK.push(convertedValue);
+                    break;
+                }
+                case DEREF_GET_ATTR: {
+                    // R1 <- DEREF_GET_ATTR R0, attr ; new DEREF_PUT_ATTR is the same (R1 is used as new value)
+                    validMove = true;
+                    final Value convertedValue = insertConversion(VALUE_STACK.pop(), valueType, declType);
+                    final Statement stmt = new Statement(Operation.DEREF_PUT_ATTR, lastInstr.lhs, lastInstr.rhs, convertedValue);
+                    stmt.setDataSize(valueType.getSize());
+                    funcStmts.add(stmt);
+                    VALUE_STACK.push(convertedValue);
+                    break;
+                }
+                case POINTER_GET: {
+                    // R1 <- POINTER_GET R0
+                    validMove = true;
+                    final Value convertedValue = insertConversion(VALUE_STACK.pop(), valueType, declType);
+                    final Statement stmt = new Statement(Operation.POINTER_PUT, convertedValue, lastInstr.lhs);
+                    stmt.setDataSize(valueType.getSize());
+                    funcStmts.add(stmt);
+                    VALUE_STACK.push(convertedValue);
+                    break;
+                }
+            }
         }
 
         if (!validMove) {
@@ -875,8 +925,9 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
             throw new UndefinedOperationException("Bad storage pointer of " + value.getText());
         }
         VALUE_STACK.push(temporary);
-        LOGGER.info("Create reference to type " + valueType);
-        return valueType;
+        final Pointer ptr = new Pointer(valueType);
+        LOGGER.info("Create " + ptr);
+        return ptr;
     }
 
     @Override
@@ -1135,9 +1186,35 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
         final String attr = ctx.attr.getText();
         final Type base = (Type) visit(ctx.base);
 
-        final Type result = base.tryAccessAttribute(attr);
+        boolean isPointer = false;
+        Type result = base.tryAccessAttribute(attr);
         if (result == null) {
-            throw new UndefinedOperationException("Type " + base + " does not allow accessing attribute " + attr);
+            // It might be a pointer. in which case we un-pointer it
+            // and see it it works
+            Value ptr = null;
+            block: {
+                if (base instanceof Pointer) {
+                    isPointer = true;
+                    ptr = VALUE_STACK.pop();
+                    Type newBase = base;
+                    while (newBase instanceof Pointer) {
+                        newBase = ((Pointer) newBase).inner;
+                        if ((result = newBase.tryAccessAttribute(attr)) != null) {
+                            break block;
+                        }
+
+                        final Register temp = Register.makeTemporary();
+                        final Statement deref = new Statement(Operation.POINTER_GET, ptr, temp);
+                        deref.setDataSize(newBase.getSize());
+                        funcStmts.add(deref);
+                        ptr = temp;
+                    }
+                    throw new UndefinedOperationException("Type " + newBase + " does not allow accessing attribute " + attr);
+                }
+                throw new UndefinedOperationException("Type " + base + " does not allow accessing attribute " + attr);
+            }
+            // If control flow reaches here, ptr *must* not be null
+            VALUE_STACK.push(ptr);
         }
 
         final Register temporary = Register.makeTemporary();
@@ -1156,7 +1233,11 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
                 }
                 throw new AssertionError("Unkown enum key of " + attr + " in type " + enumBase);
             }
-            stmt = new Statement(Operation.GET_ATTR, VALUE_STACK.pop(), Register.makeNamed(attr), temporary);
+            stmt = new Statement(
+                    isPointer ? Operation.DEREF_GET_ATTR : Operation.GET_ATTR,
+                    VALUE_STACK.pop(),
+                    Register.makeNamed(attr),
+                    temporary);
         }
         stmt.setDataSize(result.getSize());
         funcStmts.add(stmt);
@@ -1190,7 +1271,7 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
 
         final Operation[] baseSeq = convertSeqToLong(base);
 
-        if (base != null) {
+        if (baseSeq != null) {
             boolean useLong = true;
             if (baseSeq[baseSeq.length - 1] == Operation.CONV_INT_LONG) {
                 // Convert to int is enough
@@ -1208,6 +1289,10 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
 
             // Downcast back to actual type is necessary
             cleanupSeq = uncastLongSequence(useLong, result);
+        }
+
+        if (op == UnaryOperator.TILDA && base instanceof Pointer) {
+            opcode = Operation.POINTER_GET;
         }
 
         if (opcode == null) {

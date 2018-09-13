@@ -21,6 +21,11 @@ public final class FuncType implements Type {
     }
 
     @Override
+    public Type allocate() {
+        return this;
+    }
+
+    @Override
     public String toString() {
         return Arrays.toString(params) + " -> " + ret;
     }

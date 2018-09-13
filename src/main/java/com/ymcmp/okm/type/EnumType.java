@@ -28,6 +28,11 @@ public final class EnumType implements Type {
         return 32;
     }
 
+    @Override
+    public Type allocate() {
+        return this;
+    }
+
     public String[] getKeys() {
         return KEYS.get(name);
     }

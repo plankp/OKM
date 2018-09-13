@@ -99,7 +99,8 @@ stmts:
 block: LBRACKET body += stmts* RBRACKET;
 
 type:
-    BYTE
+    AMP inner = type
+    | BYTE
     | CHAR
     | SHORT
     | INT

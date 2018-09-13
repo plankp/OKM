@@ -234,6 +234,18 @@ public class Machine {
                         });
                         break;
                     }
+                    case POINTER_GET:   // POINTER_GET      dst:store, lhs:pointer
+                        locals.put(stmt.dst, ((Mutable) fetchValue(stmt.lhs, false)).getValue());
+                        break;
+                    case POINTER_PUT:   // POINTER_PUT      dst:pointer, lhs:value
+                        ((Mutable) fetchValue(stmt.dst, false)).setValue(fetchValue(stmt.lhs));
+                        break;
+                    case DEREF_GET_ATTR: //                 dst:store, lhs:pointer to struct, rhs:attr
+                        locals.put(stmt.dst, ((StructFields) ((Mutable) fetchValue(stmt.lhs, false)).getValue()).get(stmt.rhs.toString()));
+                        break;
+                    case DEREF_PUT_ATTR: //                 dst:value, lhs:pointer to struct, rhs:attr
+                        ((StructFields) ((Mutable) fetchValue(stmt.lhs, false)).getValue()).put(stmt.rhs.toString(), fetchValue(stmt.dst));
+                        break;
                     case ALLOC_STRUCT:  // ALLOC_STRUCT     dst:store, lhs:size of struct (we ignore this)
                         locals.put(stmt.dst, new StructFields());
                         break;

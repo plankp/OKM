@@ -22,6 +22,7 @@ public final class StructType implements Type {
         this.allocated = allocate;
     }
 
+    @Override
     public StructType allocate() {
         if (allocated) {
             throw new UndefinedOperationException("Cannot allocate non-struct type " + name);
