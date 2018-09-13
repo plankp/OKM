@@ -4,6 +4,8 @@ public interface Type {
 
     public int getSize();
 
+    public Type allocate();
+
     public boolean isSameType(Type t);
 
     public default boolean canConvertTo(Type t) {

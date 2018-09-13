@@ -21,6 +21,11 @@ public final class EnumKeyType implements Type {
     }
 
     @Override
+    public Type allocate() {
+        return this;
+    }
+
+    @Override
     public boolean isSameType(Type t) {
         if (t instanceof EnumType) {
             return name.equals(((EnumType) t).name);

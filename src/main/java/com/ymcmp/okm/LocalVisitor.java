@@ -406,16 +406,19 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
 
     @Override
     public Type visitType(TypeContext ctx) {
-        final String name = ctx.getText();
-        final Module.Entry ent = currentModule.get(name);
-        if (ent != null && ent.isType) {
-            final Type t = ent.type;
-            if (t instanceof EnumType) {
-                return ((EnumType) t).createCorrespondingKey();
+        if (ctx.inner == null) {
+            final String name = ctx.getText();
+            final Module.Entry ent = currentModule.get(name);
+            if (ent != null && ent.isType) {
+                final Type t = ent.type;
+                if (t instanceof EnumType) {
+                    return ((EnumType) t).createCorrespondingKey();
+                }
+                return t;
             }
-            return t;
+            throw new UndefinedOperationException(name + " does not name a type");
         }
-        throw new UndefinedOperationException(name + " does not name a type");
+        return new Pointer(visitType(ctx.inner));
     }
 
     @Override
@@ -423,7 +426,7 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
         final List<Tuple<String, Type>> list = new ArrayList<>();
         final Type type = visitType(ctx.t);
         for (int i = 0; i < ctx.getChildCount() - 2; i += 2) {
-            list.add(new Tuple<>(ctx.getChild(i).getText(), type instanceof StructType ? ((StructType) type).allocate() : type));
+            list.add(new Tuple<>(ctx.getChild(i).getText(), type.allocate()));
         }
         return list;
     }
@@ -695,13 +698,37 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
         return performCall(callable, args);
     }
 
-    private Value insertConversion(final Value val, Type src, Type dst) {
-        if (!src.isSameType(dst)) {
-            if (src instanceof EnumKeyType) {
-                // hack: we redo the above routine as if src was int
-                src = TYPE_INT;
-            }
+    private Value insertConversion(Value val, Type src, Type dst) {
+        // Since java does not support tailcalls and probably never will,
+        // we will hack one in here (its only self-recursing anyway)
+        tailcall: while (true) {
             if (!src.isSameType(dst)) {
+                if (src instanceof EnumKeyType) {
+                    src = TYPE_INT;
+                    continue tailcall;
+                }
+
+                if (src instanceof Pointer) {
+                    // DEREFER first
+                    // final List<Operation> convSeq = new ArrayList<>();
+                    Type newSrc = src;
+                    while (newSrc instanceof Pointer) {
+                        newSrc = ((Pointer) newSrc).inner;
+                        // convSeq.add(Operation.DEREFER);
+                        final Register tmp = Register.makeTemporary();
+                        final Statement derefStmt = new Statement(Operation.DEREFER, val, tmp);
+                        derefStmt.setDataSize(newSrc.getSize());
+                        funcStmts.add(derefStmt);
+                        val = tmp;
+                        if (newSrc.isSameType(dst)) {
+                            return val;
+                        }
+                    }
+
+                    src = newSrc;
+                    continue tailcall;
+                }
+
                 // Implement type casting
                 final String synthName = src + "_" + dst;
                 switch (synthName) {
@@ -720,8 +747,8 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
                         throw new AssertionError("Unknown conversion rule: " + synthName);
                 }
             }
+            return val;
         }
-        return val;
     }
 
     private Type performCall(Type base, Type... args) {
@@ -1136,9 +1163,32 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
         final String attr = ctx.attr.getText();
         final Type base = (Type) visit(ctx.base);
 
-        final Type result = base.tryAccessAttribute(attr);
+        Type result = base.tryAccessAttribute(attr);
         if (result == null) {
-            throw new UndefinedOperationException("Type " + base + " does not allow accessing attribute " + attr);
+            // It might be a pointer. in which case we un-pointer it
+            // and see it it works
+            Value ptr = null;
+            block: {
+                if (base instanceof Pointer) {
+                    ptr = VALUE_STACK.pop();
+                    Type newBase = base;
+                    while (newBase instanceof Pointer) {
+                        newBase = ((Pointer) newBase).inner;
+                        final Register temp = Register.makeTemporary();
+                        final Statement deref = new Statement(Operation.DEREFER, ptr, temp);
+                        deref.setDataSize(newBase.getSize());
+                        funcStmts.add(deref);
+                        ptr = temp;
+                        if ((result = newBase.tryAccessAttribute(attr)) != null) {
+                            break block;
+                        }
+                    }
+                    throw new UndefinedOperationException("Type " + newBase + " does not allow accessing attribute " + attr);
+                }
+                throw new UndefinedOperationException("Type " + base + " does not allow accessing attribute " + attr);
+            }
+            // If control flow reaches here, ptr *must* not be null
+            VALUE_STACK.push(ptr);
         }
 
         final Register temporary = Register.makeTemporary();

@@ -73,6 +73,7 @@ public enum Operation {
 
     REFER_VAR,
     REFER_ATTR,
+    DEREFER,
 
     ALLOC_STRUCT,
 
@@ -135,6 +136,7 @@ public enum Operation {
             case STORE_VAR:
             case REFER_VAR:
             case REFER_ATTR:
+            case DEREFER:
             case PUSH_PARAM:
             case POP_PARAM:
             case PUT_ATTR:

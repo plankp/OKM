@@ -23,6 +23,18 @@ public final class Pointer implements Type {
     }
 
     @Override
+    public boolean canConvertTo(Type t) {
+        // If type a is nested by N pointers,
+        // it can convert to a
+        return isSameType(t) || inner.canConvertTo(t);
+    }
+
+    @Override
+    public Pointer allocate() {
+        return new Pointer(inner.allocate());
+    }
+
+    @Override
     public Type tryPerformCall(Type... args) {
         return null;
     }

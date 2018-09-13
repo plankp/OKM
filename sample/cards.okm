@@ -25,7 +25,9 @@ Card new_card (suit :Suit, value :FaceValue) {
 }
 
 # All things pass by value, structs included
-unit mutate (card :Card) {
+# in order for mutate to work, we have in
+# pass in a pointer
+unit mutate (card :&Card) {
     card.suit = Suit.HEARTS
     card.value = FaceValue.QUEEN
 }
@@ -38,10 +40,6 @@ unit cards () {
 
     # The following two lines should be both true
     println(b: copy_of_card.suit == Suit.HEARTS)
-    println(b: ace_of_spades.suit == Suit.SPADES)
-
-    # This here will not mutate ace_of_spades due to pass by value
-    mutate(card: ace_of_spades)
     println(b: ace_of_spades.suit == Suit.SPADES)
 
     # This here will mutate ace_of_spades because we pass a pointer
