@@ -560,7 +560,8 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
         if (maybeNull == null) {
             stmt = new Statement(Operation.RETURN_UNIT);
         } else {
-            stmt = new Statement(Operation.RETURN_VALUE, VALUE_STACK.pop());
+            final Value onStack = VALUE_STACK.pop();
+            stmt = new Statement(Operation.RETURN_VALUE, insertConversion(onStack, valueType, conformingType));
         }
         funcStmts.add(stmt);
     }
