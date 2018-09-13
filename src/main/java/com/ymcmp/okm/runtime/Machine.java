@@ -206,9 +206,6 @@ public class Machine {
                     case LOAD_NUMERAL:  // LOAD_NUMERAL     dst:result, lhs:value
                         locals.put(stmt.dst, stmt.lhs);
                         break;
-                    case LOAD_STRUCT:   // LOAD_STRUCT      dst:store, lhs:structfield
-                        locals.put(stmt.dst, fetchValue(stmt.lhs));
-                        break;
                     case STORE_VAR:     // STORE_VAR        dst:store, lhs:value
                         locals.put(stmt.dst, fetchValue(stmt.lhs).duplicate());
                         break;
@@ -238,7 +235,7 @@ public class Machine {
                         break;
                     }
                     case ALLOC_STRUCT:  // ALLOC_STRUCT     dst:store, lhs:reference to structfield
-                        locals.put(stmt.dst, ((StructFields) fetchValue(stmt.lhs)).duplicate());
+                        locals.put(stmt.dst, new StructFields());
                         break;
                     case GET_ATTR:      // GET_ATTR         dst:store, lhs:struct, rhs:attr
                         locals.put(stmt.dst, ((StructFields) fetchValue(stmt.lhs)).get(stmt.rhs.toString()));

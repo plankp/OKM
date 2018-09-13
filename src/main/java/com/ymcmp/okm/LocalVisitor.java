@@ -544,7 +544,6 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
         LOGGER.info("Declare " + currentVisibility + " " + type);
         final Module.Entry entry = Module.Entry.newType(currentVisibility, type, currentFile);
         currentModule.put(name, entry);
-        PRE_INIT_STMTS.add(new Statement(Operation.LOAD_STRUCT, new StructFields(), Register.makeNamed(NAMING_STRAT.name(entry, name))));
         this.currentStruct = null;
         return null;
     }
@@ -1305,10 +1304,7 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
         if (ent.isType && ent.type instanceof StructType) {
             final StructType newData = ((StructType) ent.type).allocate();
             final Register temp = Register.makeTemporary();
-            final Statement stmt = new Statement(
-                    Operation.ALLOC_STRUCT,
-                    Register.makeNamed(currentScope.getProcessedName(NAMING_STRAT, structName)),
-                    temp);
+            final Statement stmt = new Statement(Operation.ALLOC_STRUCT, temp);
             stmt.setDataSize(newData.getSize());
             funcStmts.add(stmt);
             VALUE_STACK.push(temp);
