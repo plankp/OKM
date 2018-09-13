@@ -21,4 +21,15 @@ unit copy() {
     old.a.i = 14
     println(b: cpy.a.i == 12)
     println(b: old.a.i == 14)
+
+    ptr_to_a := &old.a
+    ptr_to_a.i = 8
+    println(b: ptr_to_a.i == 8)
+    println(b: cpy.a.i == 12)
+    println(b: old.a.i == 8)
+
+    old.a.i = 15
+    println(b: ptr_to_a.i == 15)
+    println(b: cpy.a.i == 12)
+    println(b: old.a.i == 15)
 }
