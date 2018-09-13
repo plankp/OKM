@@ -234,7 +234,7 @@ public class Machine {
                         });
                         break;
                     }
-                    case ALLOC_STRUCT:  // ALLOC_STRUCT     dst:store, lhs:reference to structfield
+                    case ALLOC_STRUCT:  // ALLOC_STRUCT     dst:store, lhs:size of struct (we ignore this)
                         locals.put(stmt.dst, new StructFields());
                         break;
                     case GET_ATTR:      // GET_ATTR         dst:store, lhs:struct, rhs:attr
