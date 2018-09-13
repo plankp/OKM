@@ -84,13 +84,9 @@ public final class ConstantFoldPass implements Pass {
                             final int newSize = getResultSize(stmt.op);
                             final Value newValue = ((Fixnum) stmt.lhs).changeSize(newSize);
                             replacement.put(stmt.dst.toString(), newValue);
-                            final Statement newStmt;
-                            if (stmt.dst.isTemporary()) {
-                                newStmt = new Statement(Operation.NOP);
-                            } else {
-                                newStmt = new Statement(Operation.LOAD_NUMERAL, newValue, stmt.dst);
-                                newStmt.setDataSize(newSize);
-                            }
+
+                            final Statement newStmt = new Statement(Operation.LOAD_NUMERAL, newValue, stmt.dst);
+                            newStmt.setDataSize(newSize);
                             block.set(i--, newStmt);
                             continue;
                         }
@@ -103,13 +99,9 @@ public final class ConstantFoldPass implements Pass {
                             final int newSize = getResultSize(stmt.op);
                             final Value newValue = new Fixnum(((Fixnum) stmt.lhs).value + ".0", newSize);
                             replacement.put(stmt.dst.toString(), newValue);
-                            final Statement newStmt;
-                            if (stmt.dst.isTemporary()) {
-                                newStmt = new Statement(Operation.NOP);
-                            } else {
-                                newStmt = new Statement(Operation.LOAD_NUMERAL, newValue, stmt.dst);
-                                newStmt.setDataSize(newSize);
-                            }
+
+                            final Statement newStmt = new Statement(Operation.LOAD_NUMERAL, newValue, stmt.dst);
+                            newStmt.setDataSize(newSize);
                             block.set(i--, newStmt);
                             continue;
                         }
