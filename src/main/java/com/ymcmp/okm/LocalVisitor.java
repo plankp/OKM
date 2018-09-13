@@ -781,18 +781,44 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
         stmtA.setDataSize(a.getSize());
         funcStmts.add(stmtA);
 
+        // a and b must have type in common
+        Type mergedType;
+        if (a.canConvertTo(b)) {
+            // Insert conversion sequence for a, since a was the latest statement,
+            // we mutate that directly!
+            funcStmts.remove(funcStmts.size() - 1);
+            final Statement newStmtA = new Statement(Operation.STORE_VAR, insertConversion(stmtA.lhs, a, b), temporary);
+            newStmtA.setDataSize(b.getSize());
+            funcStmts.add(newStmtA);
+            mergedType = b;
+        } else if (b.canConvertTo(a)) {
+            // Insert conversion sequence for b. Instead of overwriting the last
+            // instruction, we will *save* from GOTO to the end, insert the
+            // conversion sequence, then put it back. Of course, update the jump
+            // addresses, too!
+            final List<Statement> view = funcStmts.subList(brTrue.getAddress() - 1, funcStmts.size());
+            final List<Statement> save = new ArrayList<>(view);
+            view.clear();
+
+            funcStmts.remove(funcStmts.size() - 1);
+            final Statement newStmtB = new Statement(Operation.STORE_VAR, insertConversion(stmtB.lhs, b, a), temporary);
+            newStmtB.setDataSize(a.getSize());
+            funcStmts.add(newStmtB);
+
+            final int newBranchAddress = funcStmts.size();
+
+            funcStmts.addAll(save);
+            brTrue.setAddress(newBranchAddress + 1);
+            mergedType = a;
+        } else {
+            throw new IncompatibleTypeException(a, b);
+        }
+
         brEnd.setAddress(funcStmts.size());
 
         VALUE_STACK.push(temporary);
 
-        // a and b must have type in common
-        if (a.canConvertTo(b)) {
-            return b;
-        } else if (b.canConvertTo(a)) {
-            return a;
-        } else {
-            throw new IncompatibleTypeException(a, b);
-        }
+        return mergedType;
     }
 
     private Type processAssign(final ParseTree dest, final ParseTree tail) {
