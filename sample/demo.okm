@@ -47,14 +47,14 @@ unit count_down (from :int) =
     else
         println(i: from)
 
-int factorial (n :int) =
-    fact_aux(n: n, acc: 1)
-
-int fact_aux (n, acc :int) =
-    if n < 2
-        acc
-    else
-        fact_aux(n: n - 1, acc: n * acc)
+int factorial (n :int) {
+    acc := 1
+    while n > 1 {
+        acc = acc * n
+        n = n - 1
+    }
+    return acc
+}
 
 unit demo2(a :int) {
     # a :int;

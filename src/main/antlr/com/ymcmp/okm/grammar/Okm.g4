@@ -7,6 +7,7 @@ M_COMMENT: '<#' .*? '#>' -> Channel(HIDDEN);
 IMPORT: 'import';
 IF: 'if';
 ELSE: 'else';
+WHILE: 'while';
 
 PUBLIC: 'public';
 PROTECTED: 'protected';
@@ -27,6 +28,8 @@ ENUM: 'enum';
 STRUCT: 'struct';
 
 RETURN: 'return';
+BREAK: 'break';
+CONTINUE: 'continue';
 NEW: 'new';
 
 TRUE: 'true';
@@ -92,6 +95,9 @@ stmts:
     | assign = assignStmt
     | infSetStmt
     | ifStmt
+    | loopStmt
+    | breakStmt
+    | contStmt
     | fcallStmt
     | rcallStmt
     | block;
@@ -135,6 +141,11 @@ assignStmt: dest = expr SET value = expr;
 infSetStmt: name = IDENT INF value = expr;
 
 ifStmt: IF cond = expr brTrue = stmts (ELSE brFalse = stmts)?;
+
+loopStmt: WHILE cond = expr body = stmts;
+
+breakStmt: BREAK;
+contStmt: CONTINUE;
 
 fArgument: name = IDENT COLON value = expr;
 fArgsList: (fArgument COMMA)* fArgument;

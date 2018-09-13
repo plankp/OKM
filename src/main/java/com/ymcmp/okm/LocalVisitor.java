@@ -116,6 +116,9 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
 
     private StructType currentStruct;
 
+    private Label currentLoopHead;
+    private Label currentLoopEnd;
+
     private List<Tuple<Scope, FunctionDeclContext>> pendingFunctions;
 
     public LocalVisitor() {
@@ -226,6 +229,17 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
                 visitBlock(fctx.bodyBlock);
             }
 
+            // Perform optimization only if program is *correct*
+            final EliminateNopPass eliminateNop = new EliminateNopPass();
+            for (int i = 0; i < 2; ++i) {
+                for (final Pass pass : OPT_PASSES) {
+                    pass.process(mangledName, funcStmts);
+                    pass.reset();
+                    eliminateNop.process(mangledName, funcStmts);
+                    eliminateNop.reset();
+                }
+            }
+
             // Functions *must* end with either a branching instruction
             // next if block will be true If funcStmts does not end with a branch op
             if (funcStmts.isEmpty() ? true : !funcStmts.get(funcStmts.size() - 1).op.branches()) {
@@ -237,16 +251,24 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
                 }
             }
 
-            // Perform optimization only if program is *correct*
-            final EliminateNopPass eliminateNop = new EliminateNopPass();
-            for (int i = 0; i < 2; ++i) {
-                for (final Pass pass : OPT_PASSES) {
-                    pass.process(mangledName, funcStmts);
-                    pass.reset();
-                    eliminateNop.process(mangledName, funcStmts);
-                    eliminateNop.reset();
+            // In addition, in anything jumps beyond the function's body, it also means function failed to return
+            boolean appendReturn = false;
+            for (final Statement jmpOp : funcStmts) {
+                if (jmpOp.op.branchesToAddress()) {
+                    final Label label = (Label) jmpOp.dst;
+                    if (label.getAddress() >= funcStmts.size()) {
+                        // If the return type is unit, we will add it
+                        if (conformingType.isSameType(UnaryType.getType("unit"))) {
+                            // Just in case for some reason the function ends at 10 and it jumps to 20
+                            label.setAddress(funcStmts.size());
+                            appendReturn = true;
+                        } else {
+                            throw new RuntimeException("Function " + currentScope.functionName + " does not return!");
+                        }
+                    }
                 }
             }
+            if (appendReturn) funcStmts.add(new Statement(Operation.RETURN_UNIT));
 
             // if function has the same name as the module and takes no parameters
             final String synthName = currentScope.functionName.substring(0, currentScope.functionName.length() - 1) + ".okm";
@@ -628,6 +650,57 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
             visit(ctx.brFalse);
             brEnd.setAddress(funcStmts.size());
         }
+        return null;
+    }
+
+    @Override
+    public Object visitLoopStmt(LoopStmtContext ctx) {
+        // Save
+        final Label oldLoopHead = currentLoopHead;
+        final Label oldLoopEnd = currentLoopEnd;
+
+        currentLoopHead = new Label(funcStmts.size());
+        currentLoopEnd = new Label();
+
+        visit(ctx.cond);
+        funcStmts.add(new Statement(Operation.JUMP_IF_FALSE, VALUE_STACK.pop(), currentLoopEnd));
+
+        final int startScanningIndex = funcStmts.size();
+        visit(ctx.body);
+        final int endScanningIndex = funcStmts.size();
+
+        funcStmts.add(new Statement(Operation.GOTO, currentLoopHead));
+        currentLoopEnd.setAddress(funcStmts.size());
+
+        for (int i = startScanningIndex; i < endScanningIndex; ++i) {
+            final Statement stmt = funcStmts.get(i);
+            if (stmt.dst == currentLoopEnd) {
+                funcStmts.set(i, new Statement(stmt.op, stmt.lhs, stmt.rhs, currentLoopEnd.duplicate()));
+            }
+        }
+
+        // Restore
+        currentLoopEnd = oldLoopEnd;
+        currentLoopHead = oldLoopHead;
+
+        return null;
+    }
+
+    @Override
+    public Object visitBreakStmt(BreakStmtContext ctx) {
+        if (currentLoopEnd == null) {
+            throw new UndefinedOperationException("Cannot use break outside of loop context");
+        }
+        funcStmts.add(new Statement(Operation.GOTO, currentLoopEnd));
+        return null;
+    }
+
+    @Override
+    public Object visitContStmt(ContStmtContext ctx) {
+        if (currentLoopHead == null) {
+            throw new UndefinedOperationException("Cannot use continue outside of loop context");
+        }
+        funcStmts.add(new Statement(Operation.GOTO, currentLoopHead));
         return null;
     }
 
