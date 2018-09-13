@@ -632,6 +632,20 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
     }
 
     @Override
+    public Object visitLoopStmt(LoopStmtContext ctx) {
+        final Label head = new Label(funcStmts.size());
+        final Label end = new Label();
+
+        visit(ctx.cond);
+        funcStmts.add(new Statement(Operation.JUMP_IF_FALSE, VALUE_STACK.pop(), end));
+        visit(ctx.body);
+        funcStmts.add(new Statement(Operation.GOTO, head));
+        end.setAddress(funcStmts.size());
+
+        return null;
+    }
+
+    @Override
     public Tuple<String, Type> visitFArgument(FArgumentContext ctx) {
         return new Tuple<>(ctx.name.getText(), (Type) visit(ctx.value));
     }
