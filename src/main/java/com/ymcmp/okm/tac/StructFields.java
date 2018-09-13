@@ -2,6 +2,10 @@ package com.ymcmp.okm.tac;
 
 import java.util.HashMap;
 
+import java.util.stream.Collectors;
+
+import com.ymcmp.okm.Tuple;
+
 public final class StructFields implements Value {
 
     private final HashMap<String, Value> fields;
@@ -12,8 +16,11 @@ public final class StructFields implements Value {
 
     @Override
     public StructFields duplicate() {
+        // Need to recursively duplicate all fields!
         final StructFields newStruct = new StructFields();
-        newStruct.fields.putAll(fields);
+        newStruct.fields.putAll(fields.entrySet().stream()
+                .map(ent -> new Tuple<>(ent.getKey(), ent.getValue().duplicate()))
+                .collect(Collectors.toMap(Tuple::getA, Tuple::getB)));
         return newStruct;
     }
 

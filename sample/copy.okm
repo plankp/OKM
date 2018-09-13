@@ -1,0 +1,24 @@
+import std.io(:println(b))
+
+struct InnerData (i :int)
+
+struct Data (a :InnerData)
+
+unit copy() {
+    # new does not recursively initialize fields!
+    old := new Data
+    old.a = new InnerData
+    old.a.i = 10
+
+    println(b: old.a.i == 10)
+
+    # Copy will recursively deep copy though!
+    cpy := old
+    cpy.a.i = 12
+    println(b: cpy.a.i == 12)
+    println(b: old.a.i == 10)
+
+    old.a.i = 14
+    println(b: cpy.a.i == 12)
+    println(b: old.a.i == 14)
+}
