@@ -1299,7 +1299,9 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
             throw new AssertionError("Compiler failed to synthesize " + op + " for " + base);
         }
 
-        funcStmts.add(new Statement(opcode, value, temporary));
+        final Statement stmt = new Statement(opcode, value, temporary);
+        stmt.setDataSize(result.getSize());
+        funcStmts.add(stmt);
         VALUE_STACK.push(applyRegisterTransfer(temporary, cleanupSeq));
 
         LOGGER.info(name + " " + base + " yields " + result);
