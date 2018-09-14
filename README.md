@@ -20,3 +20,6 @@ To run directly, you could do `./gradlew run --args './sample/demo.okm'`.
 ## How to use?
 
 Pass `-h` or `--help` as argument for the first time to see what OKM supports.
+
+NOTE: If you want to get help with the `--args` option, supply a dummy argument before the help argument.
+Otherwise, gradle thinks you are trying to get help from it!
