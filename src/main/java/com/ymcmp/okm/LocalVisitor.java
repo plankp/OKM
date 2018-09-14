@@ -803,6 +803,7 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
                 // Implement type casting
                 final String synthName = src + "_" + dst;
                 switch (synthName) {
+                    // Single instruction conversions:
                     case "byte_int":     return applyRegisterTransfer(val, Operation.CONV_BYTE_INT);
                     case "short_int":    return applyRegisterTransfer(val, Operation.CONV_SHORT_INT);
                     case "long_int":     return applyRegisterTransfer(val, Operation.CONV_LONG_INT);
@@ -814,6 +815,17 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
                     case "int_double":   return applyRegisterTransfer(val, Operation.CONV_INT_DOUBLE);
                     case "long_double":  return applyRegisterTransfer(val, Operation.CONV_LONG_DOUBLE);
                     case "float_double": return applyRegisterTransfer(val, Operation.CONV_FLOAT_DOUBLE);
+
+                    // Multi-instruction conversions:
+                    case "byte_short":   return applyRegisterTransfer(val, Operation.CONV_BYTE_INT, Operation.CONV_INT_SHORT);
+                    case "byte_long":    return applyRegisterTransfer(val, Operation.CONV_BYTE_INT, Operation.CONV_INT_LONG);
+                    case "byte_float":   return applyRegisterTransfer(val, Operation.CONV_BYTE_INT, Operation.CONV_INT_FLOAT);
+                    case "byte_double":  return applyRegisterTransfer(val, Operation.CONV_BYTE_INT, Operation.CONV_INT_DOUBLE);
+                    case "short_long":   return applyRegisterTransfer(val, Operation.CONV_SHORT_INT, Operation.CONV_INT_LONG);
+                    case "short_float":  return applyRegisterTransfer(val, Operation.CONV_SHORT_INT, Operation.CONV_INT_FLOAT);
+                    case "short_double": return applyRegisterTransfer(val, Operation.CONV_SHORT_INT, Operation.CONV_INT_DOUBLE);
+
+                    // Failure case:
                     default:
                         throw new AssertionError("Unknown conversion rule: " + synthName);
                 }
