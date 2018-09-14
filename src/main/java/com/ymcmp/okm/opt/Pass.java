@@ -65,5 +65,10 @@ public interface Pass {
                 }
             }
         }
+
+        if (startIdx == 0) {
+            // That means there were not jumps, analyze the entire block
+            bicons.accept(fname, block);
+        }
     }
 }

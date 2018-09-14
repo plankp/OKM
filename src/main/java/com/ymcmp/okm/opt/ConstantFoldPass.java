@@ -22,21 +22,6 @@ public final class ConstantFoldPass implements Pass {
         for (int i = 0; i < block.size(); ++i) {
             final Statement stmt = block.get(i);
 
-            // Try substitute temporaries
-            if (safeIsTemporary(stmt.dst)) {
-                switch (stmt.op) {
-                    case LOAD_NUMERAL:
-                        replacement.put(stmt.dst.toString(), stmt.lhs);
-                        continue;
-                    case LOAD_TRUE:
-                        replacement.put(stmt.dst.toString(), Fixnum.TRUE);
-                        continue;
-                    case LOAD_FALSE:
-                        replacement.put(stmt.dst.toString(), Fixnum.FALSE);
-                        continue;
-                }
-            }
-
             if (stmt.dst instanceof Register) {
                 switch (stmt.op) {
                     case CONV_BYTE_INT:
