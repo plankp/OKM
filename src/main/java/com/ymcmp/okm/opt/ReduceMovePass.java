@@ -10,6 +10,10 @@ public final class ReduceMovePass implements Pass {
 
     @Override
     public void process(final String fname, final List<Statement> block) {
+        handleJumpRange(fname, block, this::reduceMoves);
+    }
+
+    private void reduceMoves(final String fname, final List<Statement> block) {
         for (int i = 0; i < block.size() - 1; ++i) {
             final Statement stmt = block.get(i);
             if (stmt.op == Operation.STORE_VAR) {
