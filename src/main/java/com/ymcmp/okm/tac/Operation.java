@@ -98,6 +98,7 @@ public enum Operation {
     PUSH_PARAM,
 
     CALL,
+    CALL_UNIT,
     TAILCALL;
 
     public boolean isCmp() {
@@ -116,7 +117,9 @@ public enum Operation {
             case PUSH_PARAM:
             case PUT_ATTR:
             case DEREF_PUT_ATTR:
+            case CALL_UNIT:
             case RETURN_VALUE:
+            case TAILCALL:
                 return true;
             default:
                 return false;
@@ -159,6 +162,7 @@ public enum Operation {
             case POP_PARAM:
             case PUT_ATTR:
             case CALL:
+            case CALL_UNIT:
             case TAILCALL:
                 return true;
             default:

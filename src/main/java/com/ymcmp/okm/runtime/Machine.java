@@ -282,6 +282,9 @@ public class Machine {
                     case CALL:          //      dst:store, lhs:callsite
                         locals.put(stmt.dst, execute(code, fetchValue(stmt.lhs).toString()));
                         break;
+                    case CALL_UNIT:     //      dst:callsite
+                        execute(code, fetchValue(stmt.dst).toString());
+                        break;
                     case TAILCALL: {    //      dst:callsite
                         // Update parameter $list, reset counter $i and restart
                         // unless it is one of the special functions

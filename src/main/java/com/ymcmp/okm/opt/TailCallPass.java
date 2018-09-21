@@ -28,6 +28,20 @@ public final class TailCallPass implements Pass {
                     }
                     break;
                 }
+                case CALL_UNIT: {
+                    final int nextAddr = getNextNonGotoOpAddress(block, i);
+                    if (nextAddr < block.size()) {
+                        final Statement next = block.get(nextAddr);
+                        if (next.op == Operation.RETURN_UNIT) {
+                            // Next statement returns the unit,
+                            // which is same as the return value of CALL_UNIT
+                            block.set(i + 1, new Statement(Operation.NOP));
+                            block.set(i--, new Statement(Operation.TAILCALL, stmt.dst));
+                            continue;
+                        }
+                    }
+                    break;
+                }
                 case JUMP_IF_TRUE:
                     if (stmt.lhs.isNumeric()) {
                         final Fixnum f = (Fixnum) stmt.lhs;

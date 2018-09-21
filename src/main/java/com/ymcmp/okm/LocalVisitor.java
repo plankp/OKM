@@ -139,11 +139,8 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
         // Perform pre-initialization (such as setting up enums)
         initializer.addAll(PRE_INIT_STMTS);
         // Initializes all included modules
-        final Register dummyRegister = Register.makeTemporary();
         for (final String func : MODULE_INITS) {
-            final Statement stmt = new Statement(Operation.CALL, Register.makeNamed(func), dummyRegister);
-            stmt.setDataSize(UnaryType.getType("unit").getSize());
-            initializer.add(stmt);
+            initializer.add(new Statement(Operation.CALL_UNIT, Register.makeNamed(func)));
         }
         // Use RETURN_UNIT
         initializer.add(new Statement(Operation.RETURN_UNIT));
@@ -580,7 +577,7 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
         }
 
         final Statement stmt;
-        if (maybeNull == null) {
+        if (valueType.isSameType(UnaryType.getType("unit"))) {
             stmt = new Statement(Operation.RETURN_UNIT);
         } else {
             final Value onStack = VALUE_STACK.pop();
@@ -853,9 +850,18 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
             stmt.setDataSize(paramType.getSize());
             funcStmts.add(stmt);
         }
-        final Register temporary = Register.makeTemporary();
-        final Statement stmt = new Statement(Operation.CALL, VALUE_STACK.pop(), temporary);
-        stmt.setDataSize(result.getSize());
+        final Statement stmt;
+        final Value temporary;
+        if (result.isSameType(UnaryType.getType("unit"))) {
+            // if the function returns unit, we use CALL_UNIT instead
+            // which does not use temporaries
+            temporary = Fixnum.FALSE;   // really, any pure value will work
+            stmt = new Statement(Operation.CALL_UNIT, VALUE_STACK.pop());
+        } else {
+            temporary = Register.makeTemporary();
+            stmt = new Statement(Operation.CALL, VALUE_STACK.pop(), temporary);
+            stmt.setDataSize(result.getSize());
+        }
         funcStmts.add(stmt);
         VALUE_STACK.push(temporary);
 
@@ -871,12 +877,22 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
         // it's like a crappy phi function in SSA form
         final Register temporary = Register.makeTemporary();
 
+        // unit functions
+        int numOfUnitFuncs = 0;
+
         final Label brTrue = new Label();
         funcStmts.add(new Statement(Operation.JUMP_IF_TRUE, VALUE_STACK.pop(), brTrue));
 
         final Type b = (Type) visit(ctx.brFalse);
-        final Statement stmtB = new Statement(Operation.STORE_VAR, VALUE_STACK.pop(), temporary);
-        stmtB.setDataSize(b.getSize());
+        final Value valB = VALUE_STACK.pop();;
+        final Statement stmtB;
+        if (b.isSameType(UnaryType.getType("unit"))) {
+            stmtB = new Statement(Operation.NOP);
+            ++numOfUnitFuncs;
+        } else {
+            stmtB = new Statement(Operation.STORE_VAR, valB, temporary);
+            stmtB.setDataSize(b.getSize());
+        }
         funcStmts.add(stmtB);
 
         final Label brEnd = new Label();
@@ -885,13 +901,23 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
         brTrue.setAddress(funcStmts.size());
 
         final Type a = (Type) visit(ctx.brTrue);
-        final Statement stmtA = new Statement(Operation.STORE_VAR, VALUE_STACK.pop(), temporary);
-        stmtA.setDataSize(a.getSize());
+        final Value valA = VALUE_STACK.pop();;
+        final Statement stmtA;
+        if (a.isSameType(UnaryType.getType("unit"))) {
+            stmtA = new Statement(Operation.NOP);
+            ++numOfUnitFuncs;
+        } else {
+            stmtA = new Statement(Operation.STORE_VAR, valA, temporary);
+            stmtA.setDataSize(a.getSize());
+        }
         funcStmts.add(stmtA);
 
         // a and b must have type in common
         Type mergedType;
-        if (a.canConvertTo(b)) {
+        if (numOfUnitFuncs == 2) {
+            // Both branches are unit, no need for conversions
+            mergedType = a;
+        } else if (a.canConvertTo(b)) {
             // Insert conversion sequence for a, since a was the latest statement,
             // we mutate that directly!
             funcStmts.remove(funcStmts.size() - 1);
