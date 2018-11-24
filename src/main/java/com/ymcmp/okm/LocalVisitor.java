@@ -210,8 +210,9 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
             // Callee retrieves arguments
             for (final Map.Entry<String, Type> param : currentScope.getCurrentLocals()) {
                 final Register slot = Register.makeNamed(currentScope.getProcessedName(NAMING_STRAT, param.getKey()));
-                final Statement stmt = new Statement(Operation.POP_PARAM, slot);
-                stmt.setDataSize(param.getValue().getSize());
+                final Type t = param.getValue();
+                final Statement stmt = new Statement(t.isFloatPoint() ? Operation.POP_PARAM_FLOAT : Operation.POP_PARAM_INT, slot);
+                stmt.setDataSize(t.getSize());
                 funcStmts.add(stmt);
             }
 

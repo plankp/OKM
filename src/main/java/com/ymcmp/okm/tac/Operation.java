@@ -93,7 +93,8 @@ public enum Operation {
     JUMP_IF_TRUE,
     JUMP_IF_FALSE,
 
-    POP_PARAM,
+    POP_PARAM_INT,
+    POP_PARAM_FLOAT,
 
     PUSH_PARAM,
 
@@ -159,7 +160,8 @@ public enum Operation {
             case POINTER_PUT:
             case DEREF_PUT_ATTR:
             case PUSH_PARAM:
-            case POP_PARAM:
+            case POP_PARAM_INT:
+            case POP_PARAM_FLOAT:
             case PUT_ATTR:
             case CALL:
             case CALL_UNIT:

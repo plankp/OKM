@@ -272,7 +272,8 @@ public class Machine {
                             i = ((Label) stmt.dst).getAddress() - 1;    // -1 because loop invariant
                         }
                         break;
-                    case POP_PARAM:     //      dst:store
+                    case POP_PARAM_INT: //      dst:store
+                    case POP_PARAM_FLOAT: //    dst:store
                         locals.put(stmt.dst, callStack.pop());
                         break;
                     case PUSH_PARAM:    //      dst:value
