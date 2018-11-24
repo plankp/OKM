@@ -18,6 +18,9 @@ import com.ymcmp.okm.tac.Statement;
 
 import com.ymcmp.okm.runtime.Machine;
 
+import com.ymcmp.okm.converter.IRFormatter;
+import com.ymcmp.okm.converter.X86Converter;
+
 public class App {
 
     public static class Args {
@@ -35,7 +38,10 @@ public class App {
         private boolean showIR = true;
 
         @Parameter(names={"--exec-ir"}, description="Executes intermediate representation after compilation", arity=1)
-        private boolean execIR = true;
+        private boolean execIR = false;
+
+        @Parameter(names={"--to-x86"}, description="Converts IR to x86 Intel syntax assembly")
+        private boolean toX86 = true;
 
         @Parameter(names={"--help", "-h"}, description="Displays help")
         private boolean help = false;
@@ -77,12 +83,17 @@ public class App {
                 .compile(argData.inputPaths);
 
         if (argData.showIR) {
+            final IRFormatter conv = new IRFormatter();
             result.forEach((k, v) -> {
-                System.out.println("Function " + k);
-                for (int i = 0; i < v.size(); ++i) {
-                    System.out.printf("%4d %s", i, v.get(i));
-                    System.out.println("");
-                }
+                System.out.println(conv.convert(k, v));
+                System.out.println("");
+            });
+        }
+
+        if (argData.toX86) {
+            final X86Converter conv = new X86Converter();
+            result.forEach((k, v) -> {
+                System.out.println(conv.convert(k, v));
                 System.out.println("");
             });
         }
