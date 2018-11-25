@@ -41,7 +41,7 @@ public class App {
         private boolean execIR = false;
 
         @Parameter(names={"--to-x86"}, description="Converts IR to x86 Intel syntax assembly")
-        private boolean toX86 = true;
+        private boolean toX86 = false;
 
         @Parameter(names={"--help", "-h"}, description="Displays help")
         private boolean help = false;
