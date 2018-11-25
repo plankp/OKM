@@ -90,8 +90,7 @@ public class AMD64Converter implements Converter {
                     if (dataMapping.containsKey(stmt.dst)) {
                         code.add("    mov " + dataMapping.get(stmt.dst) + ", edi");
                     } else {
-                        // int is 32 bits, or 4 bytes
-                        final String loc = String.format("%s [rbp - %d]", toWordSizeString(4), (stackOffset += 4));
+                        final String loc = String.format("[rbp - %d]", (stackOffset += 4));
                         dataMapping.put(stmt.dst, loc);
                         code.add("    mov " + loc + ", edi");
                     }
@@ -102,8 +101,7 @@ public class AMD64Converter implements Converter {
                     if (dataMapping.containsKey(stmt.dst)) {
                         code.add("    mov " + dataMapping.get(stmt.dst) + ", rdi");
                     } else {
-                        // long is 64 bits, or 8 bytes
-                        final String loc = String.format("%s [rbp - %d]", toWordSizeString(8), (stackOffset += 8));
+                        final String loc = String.format("[rbp - %d]", (stackOffset += 8));
                         dataMapping.put(stmt.dst, loc);
                         code.add("    mov " + loc + ", rdi");
                     }
@@ -114,8 +112,7 @@ public class AMD64Converter implements Converter {
                     if (dataMapping.containsKey(stmt.dst)) {
                         code.add("    mov " + dataMapping.get(stmt.dst) + ", dil");
                     } else {
-                        // byte is 1 byte
-                        final String loc = String.format("%s [rbp - %d]", toWordSizeString(1), (stackOffset += 1));
+                        final String loc = String.format("[rbp - %d]", (stackOffset += 1));
                         dataMapping.put(stmt.dst, loc);
                         code.add("    mov " + loc + ", dil");
                     }
@@ -126,8 +123,7 @@ public class AMD64Converter implements Converter {
                     if (dataMapping.containsKey(stmt.dst)) {
                         code.add("    mov " + dataMapping.get(stmt.dst) + ", di");
                     } else {
-                        // short is 2 bytes
-                        final String loc = String.format("%s [rbp - %d]", toWordSizeString(2), (stackOffset += 2));
+                        final String loc = String.format("[rbp - %d]", (stackOffset += 2));
                         dataMapping.put(stmt.dst, loc);
                         code.add("    mov " + loc + ", di");
                     }
@@ -138,8 +134,7 @@ public class AMD64Converter implements Converter {
                     if (dataMapping.containsKey(stmt.dst)) {
                         code.add("    mov " + dataMapping.get(stmt.dst) + ", edi");
                     } else {
-                        // int is 4 bytes
-                        final String loc = String.format("%s [rbp - %d]", toWordSizeString(4), (stackOffset += 4));
+                        final String loc = String.format("[rbp - %d]", (stackOffset += 4));
                         dataMapping.put(stmt.dst, loc);
                         code.add("    mov " + loc + ", edi");
                     }
@@ -163,8 +158,7 @@ public class AMD64Converter implements Converter {
                     if (dataMapping.containsKey(stmt.dst)) {
                         code.add("    movsd " + dataMapping.get(stmt.dst) + ", xmm0");
                     } else {
-                        // double is 8 bytes
-                        final String loc = String.format("%s [rbp - %d]", toWordSizeString(8), (stackOffset += 8));
+                        final String loc = String.format("[rbp - %d]", (stackOffset += 8));
                         dataMapping.put(stmt.dst, loc);
                         code.add("    movsd " + loc + ", xmm0");
                     }
@@ -251,11 +245,11 @@ public class AMD64Converter implements Converter {
                     final int bs = stmt.getDataSize() / 8;
                     String dst;
                     if (floatParam < 8) {
-                        dst = String.format("%s [rbp - %d]", toWordSizeString(bs), (stackOffset = roundToNextDivisible(stackOffset, bs)));
+                        dst = String.format("[rbp - %d]", (stackOffset = roundToNextDivisible(stackOffset, bs)));
                         code.add("    " + (bs == 4 ? "movss" : "movsd") + " " + dst + ", " + getFloatRegParam(floatParam));
                     } else {
                         // Leave the data on the stack for now
-                        dst = String.format("%s [rbp + %d]", toWordSizeString(bs), 16 + 8 * (floatParam - 8));
+                        dst = String.format("[rbp + %d]", 16 + 8 * (floatParam - 8));
                     }
 
                     dataMapping.put(stmt.dst, dst);
@@ -266,11 +260,11 @@ public class AMD64Converter implements Converter {
                     final int bs = stmt.getDataSize() / 8;
                     String dst;
                     if (intParam < 6) {
-                        dst = String.format("%s [rbp - %d]", toWordSizeString(bs), (stackOffset = roundToNextDivisible(stackOffset, bs)));
+                        dst = String.format("[rbp - %d]", (stackOffset = roundToNextDivisible(stackOffset, bs)));
                         code.add("    mov " + dst + ", " + getIntRegParam(intParam, bs));
                     } else {
                         // Leave the data on the stack for now
-                        dst = String.format("%s [rbp + %d]", toWordSizeString(bs), 16 + 8 * (intParam - 6));
+                        dst = String.format("[rbp + %d]", 16 + 8 * (intParam - 6));
                     }
 
                     dataMapping.put(stmt.dst, dst);
@@ -295,7 +289,7 @@ public class AMD64Converter implements Converter {
                 case INT_NE:
                     intCmp("setne", code, stmt);
                     break;
-                case LONG_CMP:
+                case LONG_CMP: {
                     code.add("    xor ecx, ecx");
                     code.add("    mov rax, " + getNumber(stmt.lhs));
                     code.add("    cmp rax, " + getNumber(stmt.rhs));
@@ -306,12 +300,12 @@ public class AMD64Converter implements Converter {
                     if (dataMapping.containsKey(stmt.dst)) {
                         code.add("    mov " + dataMapping.get(stmt.dst) + ", eax");
                     } else {
-                        // int is 4 bytes
-                        final String loc = String.format("%s [rbp - %d]", toWordSizeString(4), (stackOffset += 4));
+                        final String loc = String.format("[rbp - %d]", (stackOffset += 4));
                         dataMapping.put(stmt.dst, loc);
                         code.add("    mov " + loc + ", eax");
                     }
                     break;
+                }
                 case FLOAT_CMP:
                     floatCmp(false, code, stmt);
                     break;
@@ -330,10 +324,11 @@ public class AMD64Converter implements Converter {
                     final String tmp = getIntRegister(bs);
                     code.add("    xor rax, rax");
                     code.add("    mov " + tmp + ", " + getNumber(stmt.lhs));
+
                     if (dataMapping.containsKey(stmt.dst)) {
                         code.add("    mov " + dataMapping.get(stmt.dst) + ", " + tmp);
                     } else {
-                        final String loc = String.format("%s [rbp - %d]", toWordSizeString(bs), (stackOffset += bs));
+                        final String loc = String.format("[rbp - %d]", (stackOffset += bs));
                         dataMapping.put(stmt.dst, loc);
                         code.add("    mov " + loc + ", " + tmp);
                     }
@@ -343,11 +338,13 @@ public class AMD64Converter implements Converter {
                     code.add("    jmp .L" + ((Label) stmt.dst).getAddress());
                     break;
                 case JUMP_IF_TRUE:
-                    code.add("    cmp " + getNumber(stmt.lhs) + ", 0");
+                    // int is 4 bytes
+                    code.add("    cmp " + toWordSizeString(4) + " " + getNumber(stmt.lhs) + ", 0");
                     code.add("    jne .L" + ((Label) stmt.dst).getAddress());
                     break;
                 case JUMP_IF_FALSE:
-                    code.add("    cmp " + getNumber(stmt.lhs) + ", 0");
+                    // int is 4 bytes
+                    code.add("    cmp " + toWordSizeString(4) + " " + getNumber(stmt.lhs) + ", 0");
                     code.add("    je .L" + ((Label) stmt.dst).getAddress());
                     break;
                 case RETURN_FLOAT:
@@ -355,10 +352,11 @@ public class AMD64Converter implements Converter {
                     generateFuncEpilogue(code);
                     break;
                 case RETURN_INT: {
+                    final int bs = stmt.getDataSize() / 8;
                     final String src = getNumber(stmt.dst);
-                    switch (stmt.getDataSize() / 8) {
+                    switch (bs) {
                         case 1:
-                            code.add("    movsx eax, " + src);
+                            code.add("    movsx eax, " + toWordSizeString(bs) + " " + src);
                             break;
                         case 2:
                             code.add("    mov ax, " + src);
@@ -371,7 +369,7 @@ public class AMD64Converter implements Converter {
                             code.add("    mov rax, " + src);
                             break;
                         default:
-                            throw new AssertionError("Unknown data size " + (stmt.getDataSize() / 8));
+                            throw new AssertionError("Unknown data size " + bs);
                     }
                     generateFuncEpilogue(code);
                     break;
@@ -434,12 +432,12 @@ public class AMD64Converter implements Converter {
             // It is float, which needs to be read from data section
             final int bs = num.size / 8;
             if (sectData.containsKey(num)) {
-                return toWordSizeString(bs) + " [rel " + sectData.get(num).label + "]";
+                return "[rel " + sectData.get(num).label + "]";
             }
             final String label = "_K" + sectData.size();
-            sectData.put(num, new DataValue(label, toDataSizeString(bs) + " " + num.value));
+            sectData.put(num, new DataValue(label, num.value));
             // Explicit relative addressing!
-            return toWordSizeString(bs) + " [rel " + label + "]";
+            return "[rel " + label + "]";
         }
         return dataMapping.get(v);
     }
@@ -531,7 +529,7 @@ public class AMD64Converter implements Converter {
         if (dataMapping.containsKey(stmt.dst)) {
             code.add("    mov " + dataMapping.get(stmt.dst) + ", " + accum);
         } else {
-            final String loc = String.format("%s [rbp - %d]", toWordSizeString(bs), (stackOffset += bs));
+            final String loc = String.format("[rbp - %d]", (stackOffset += bs));
             dataMapping.put(stmt.dst, loc);
             code.add("    mov " + loc + ", " + accum);
         }
@@ -546,7 +544,7 @@ public class AMD64Converter implements Converter {
         if (dataMapping.containsKey(stmt.dst)) {
             code.add("    mov " + dataMapping.get(stmt.dst) + ", " + accum);
         } else {
-            final String loc = String.format("%s [rbp - %d]", toWordSizeString(bs), (stackOffset += bs));
+            final String loc = String.format("[rbp - %d]", (stackOffset += bs));
             dataMapping.put(stmt.dst, loc);
             code.add("    mov " + loc + ", " + accum);
         }
@@ -561,7 +559,7 @@ public class AMD64Converter implements Converter {
         if (dataMapping.containsKey(stmt.dst)) {
             code.add("    mov " + dataMapping.get(stmt.dst) + ", " + accum);
         } else {
-            final String loc = String.format("%s [rbp - %d]", toWordSizeString(bs), (stackOffset += bs));
+            final String loc = String.format("[rbp - %d]", (stackOffset += bs));
             dataMapping.put(stmt.dst, loc);
             code.add("    mov " + loc + ", " + accum);
         }
@@ -570,7 +568,7 @@ public class AMD64Converter implements Converter {
     private void intMul(boolean eightBytes, List<String> code, Statement stmt) {
         final int bs = eightBytes ? 8 : 4;
         final String accum = getIntRegister(bs);
-        code.add("    mov "+ accum + ", " + getNumber(stmt.lhs));
+        code.add("    mov " + accum + ", " + getNumber(stmt.lhs));
         if (stmt.rhs.isNumeric()) {
             // IMUL <imm> is not a thing
             final String scale = ((Fixnum) stmt.rhs).value;
@@ -599,7 +597,7 @@ public class AMD64Converter implements Converter {
         if (dataMapping.containsKey(stmt.dst)) {
             code.add("    mov " + dataMapping.get(stmt.dst) + ", " + accum);
         } else {
-            final String loc = String.format("%s [rbp - %d]", toWordSizeString(bs), (stackOffset += bs));
+            final String loc = String.format("[rbp - %d]", (stackOffset += bs));
             dataMapping.put(stmt.dst, loc);
             code.add("    mov " + loc + ", " + accum);
         }
@@ -624,7 +622,7 @@ public class AMD64Converter implements Converter {
         if (dataMapping.containsKey(stmt.dst)) {
             code.add("    mov " + dataMapping.get(stmt.dst) + ", " + resultReg);
         } else {
-            final String loc = String.format("%s [rbp - %d]", toWordSizeString(bs), (stackOffset += bs));
+            final String loc = String.format("[rbp - %d]", (stackOffset += bs));
             dataMapping.put(stmt.dst, loc);
             code.add("    mov " + loc + ", " + resultReg);
         }
@@ -640,7 +638,7 @@ public class AMD64Converter implements Converter {
             code.add("    mov " + dataMapping.get(stmt.dst) + ", ecx");
         } else {
             // int is 4 bytes
-            final String loc = String.format("%s [rbp - %d]", toWordSizeString(4), (stackOffset += 4));
+            final String loc = String.format("[rbp - %d]", (stackOffset += 4));
             dataMapping.put(stmt.dst, loc);
             code.add("    mov " + loc + ", ecx");
         }
@@ -652,7 +650,7 @@ public class AMD64Converter implements Converter {
             code.add("    mov " + dataMapping.get(stmt.dst) + ", " + k);
         } else {
             // bool is 1 byte
-            final String loc = String.format("%s [rbp - %d]", toWordSizeString(1), (stackOffset += 1));
+            final String loc = String.format("[rbp - %d]", (stackOffset += 1));
             dataMapping.put(stmt.dst, loc);
             code.add("    mov " + loc + ", " + k);
         }
@@ -669,7 +667,7 @@ public class AMD64Converter implements Converter {
             code.add("    " + outOp + " " + dataMapping.get(stmt.dst) + ", xmm1");
         } else {
             final int bs = quadOut ? 8 : 4;
-            final String loc = String.format("%s [rbp - %d]", toWordSizeString(bs), (stackOffset += bs));
+            final String loc = String.format("[rbp - %d]", (stackOffset += bs));
             dataMapping.put(stmt.dst, loc);
             code.add("    " + outOp + " " + loc + ", xmm1");
         }
@@ -685,27 +683,28 @@ public class AMD64Converter implements Converter {
             code.add("    " + mov + " " + dataMapping.get(stmt.dst) + ", xmm0");
         } else {
             final int bs = quad ? 8 : 4;
-            final String loc = String.format("%s [rbp - %d]", toWordSizeString(bs), (stackOffset += bs));
+            final String loc = String.format("[rbp - %d]", (stackOffset += bs));
             dataMapping.put(stmt.dst, loc);
             code.add("    " + mov + " " + loc + ", xmm0");
         }
     }
 
     private void floatFprem(boolean quad, List<String> code, Statement stmt) {
+        final int bs = quad ? 8 : 4;
+        final String sz = toWordSizeString(bs);
         code.add("    ;; ST(1) <- rhs");
-        code.add("    fld " + getNumber(stmt.rhs));
+        code.add("    fld " + sz + " " + getNumber(stmt.rhs));
         code.add("    ;; ST(0) <- lhs");
-        code.add("    fld " + getNumber(stmt.lhs));
+        code.add("    fld " + sz + " " + getNumber(stmt.lhs));
         code.add("    ;; ST(0) <- ST(0) % ST(1)");
         code.add("    fprem");
 
         if (dataMapping.containsKey(stmt.dst)) {
-            code.add("    fstp " + dataMapping.get(stmt.dst));
+            code.add("    fstp " + sz + " " + dataMapping.get(stmt.dst));
         } else {
-            final int bs = quad ? 8 : 4;
-            final String loc = String.format("%s [rbp - %d]", toWordSizeString(bs), (stackOffset += bs));
+            final String loc = String.format("[rbp - %d]", (stackOffset += bs));
             dataMapping.put(stmt.dst, loc);
-            code.add("    fstp " + loc);
+            code.add("    fstp " + sz + " " + loc);
         }
     }
 
@@ -725,7 +724,7 @@ public class AMD64Converter implements Converter {
             code.add("    mov " + dataMapping.get(stmt.dst) + ", eax");
         } else {
             // int is 4 bytes
-            final String loc = String.format("%s [rbp - %d]", toWordSizeString(4), (stackOffset += 4));
+            final String loc = String.format("[rbp - %d]", (stackOffset += 4));
             dataMapping.put(stmt.dst, loc);
             code.add("    mov " + loc + ", eax");
         }
@@ -742,7 +741,7 @@ public class AMD64Converter implements Converter {
             code.add("    " + mov + " " + dataMapping.get(stmt.dst) + ", xmm0");
         } else {
             final int bs = quad ? 8 : 4;
-            final String loc = String.format("%s [rbp - %d]", toWordSizeString(bs), (stackOffset += bs));
+            final String loc = String.format("[rbp - %d]", (stackOffset += bs));
             dataMapping.put(stmt.dst, loc);
             code.add("    " + mov + " " + loc + ", xmm0");
         }
