@@ -238,34 +238,34 @@ public class AMD64Converter implements Converter {
                     }
                     break;
                 case LONG_ADD:
-                    genericAdd(true, code, stmt);
+                    intAdd(true, code, stmt);
                     break;
                 case LONG_SUB:
-                    genericSub(true, code, stmt);
+                    intSub(true, code, stmt);
                     break;
                 case LONG_MUL:
-                    genericMul(true, code, stmt);
+                    intMul(true, code, stmt);
                     break;
                 case LONG_DIV:
-                    genericDiv(true, "rax", code, stmt);
+                    intDivMod(true, "rax", code, stmt);
                     break;
                 case LONG_MOD:
-                    genericDiv(true, "rdx", code, stmt);
+                    intDivMod(true, "rdx", code, stmt);
                     break;
                 case INT_ADD:
-                    genericAdd(false, code, stmt);
+                    intAdd(false, code, stmt);
                     break;
                 case INT_SUB:
-                    genericSub(false, code, stmt);
+                    intSub(false, code, stmt);
                     break;
                 case INT_MUL:
-                    genericMul(false, code, stmt);
+                    intMul(false, code, stmt);
                     break;
                 case INT_DIV:
-                    genericDiv(false, "eax", code, stmt);
+                    intDivMod(false, "eax", code, stmt);
                     break;
                 case INT_MOD:
-                    genericDiv(false, "edx", code, stmt);
+                    intDivMod(false, "edx", code, stmt);
                     break;
                 case POP_PARAM_FLOAT: {
                     final int bs = stmt.getDataSize() / 8;
@@ -298,22 +298,22 @@ public class AMD64Converter implements Converter {
                     break;
                 }
                 case INT_LT:
-                    genericIntCmp("setl", code, stmt);
+                    intCmp("setl", code, stmt);
                     break;
                 case INT_GT:
-                    genericIntCmp("setg", code, stmt);
+                    intCmp("setg", code, stmt);
                     break;
                 case INT_LE:
-                    genericIntCmp("setle", code, stmt);
+                    intCmp("setle", code, stmt);
                     break;
                 case INT_GE:
-                    genericIntCmp("setge", code, stmt);
+                    intCmp("setge", code, stmt);
                     break;
                 case INT_EQ:
-                    genericIntCmp("sete", code, stmt);
+                    intCmp("sete", code, stmt);
                     break;
                 case INT_NE:
-                    genericIntCmp("setne", code, stmt);
+                    intCmp("setne", code, stmt);
                     break;
                 case LONG_CMP:
                     code.add("    xor ecx, ecx");
@@ -536,7 +536,7 @@ public class AMD64Converter implements Converter {
         throw new AssertionError("Invalid param slot: " + idx);
     }
 
-    private void genericAdd(boolean eightBytes, List<String> code, Statement stmt) {
+    private void intAdd(boolean eightBytes, List<String> code, Statement stmt) {
         final int bs = eightBytes ? 8 : 4;
         final String accum = getIntRegister(bs);
         code.add("    mov " + accum + ", " + getNumber(stmt.lhs));
@@ -551,7 +551,7 @@ public class AMD64Converter implements Converter {
         }
     }
 
-    private void genericSub(boolean eightBytes, List<String> code, Statement stmt) {
+    private void intSub(boolean eightBytes, List<String> code, Statement stmt) {
         final int bs = eightBytes ? 8 : 4;
         final String accum = getIntRegister(bs);
         code.add("    mov " + accum + ", " + getNumber(stmt.lhs));
@@ -566,7 +566,7 @@ public class AMD64Converter implements Converter {
         }
     }
 
-    private void genericMul(boolean eightBytes, List<String> code, Statement stmt) {
+    private void intMul(boolean eightBytes, List<String> code, Statement stmt) {
         final int bs = eightBytes ? 8 : 4;
         final String accum = getIntRegister(bs);
         code.add("    mov "+ accum + ", " + getNumber(stmt.lhs));
@@ -604,7 +604,7 @@ public class AMD64Converter implements Converter {
         }
     }
 
-    private void genericDiv(boolean eightBytes, String resultReg, List<String> code, Statement stmt) {
+    private void intDivMod(boolean eightBytes, String resultReg, List<String> code, Statement stmt) {
         final int bs = eightBytes ? 8 : 4;
         final String accum = getIntRegister(bs);
 
@@ -629,7 +629,7 @@ public class AMD64Converter implements Converter {
         }
     }
 
-    private void genericIntCmp(String cmpInstr, List<String> code, Statement stmt) {
+    private void intCmp(String cmpInstr, List<String> code, Statement stmt) {
         code.add("    xor ecx, ecx");
         code.add("    mov eax, " + getNumber(stmt.lhs));
         code.add("    cmp eax, " + getNumber(stmt.rhs));
