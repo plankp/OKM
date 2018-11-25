@@ -27,9 +27,15 @@ public class AMD64Converter implements Converter {
         }
 
         public String output() {
-            return label + " " + value;
+            return label + ":\n    " + value;
         }
     }
+
+    private static final String SECTION_DATA_HEADER =
+            "section .data\n" +
+            "align 16\n" +
+            "CC0 dd 2147483648,0,0,0\n" +
+            "CC1 dd 0,-2147483648,0,0\n";
 
     private final Map<Fixnum, DataValue> sectData = new HashMap<>();
     private final List<String> sectText = new ArrayList<>();
@@ -46,7 +52,7 @@ public class AMD64Converter implements Converter {
     @Override
     public String getResult() {
         return Stream.concat(
-                Stream.concat(Stream.of("section .data"), sectData.values().stream().map(DataValue::output)),
+                Stream.concat(Stream.of(SECTION_DATA_HEADER), sectData.values().stream().map(DataValue::output)),
                 Stream.concat(Stream.of("section .text"), sectText.stream()))
                 .collect(Collectors.joining("\n\n"));
     }
@@ -178,6 +184,9 @@ public class AMD64Converter implements Converter {
                 case DOUBLE_MOD:
                     floatFprem(true, code, stmt);
                     break;
+                case DOUBLE_NEG:
+                    floatNegate(true, code, stmt);
+                    break;
                 case FLOAT_ADD:
                     floatSSEMath(false, "add", code, stmt);
                     break;
@@ -192,6 +201,9 @@ public class AMD64Converter implements Converter {
                     break;
                 case FLOAT_MOD:
                     floatFprem(false, code, stmt);
+                    break;
+                case FLOAT_NEG:
+                    floatNegate(false, code, stmt);
                     break;
                 case LONG_ADD:
                     intAdd(true, code, stmt);
@@ -716,6 +728,23 @@ public class AMD64Converter implements Converter {
             final String loc = String.format("%s [rbp - %d]", toWordSizeString(4), (stackOffset += 4));
             dataMapping.put(stmt.dst, loc);
             code.add("    mov " + loc + ", eax");
+        }
+    }
+
+    private void floatNegate(boolean quad, List<String> code, Statement stmt) {
+        final String mov = quad ? "movsd" : "movss";
+        final String neg = quad ? "xorpd" : "xorps";
+        final String dat = quad ? "CC1" : "CC0";
+        code.add("    " + mov + " xmm0, " + getNumber(stmt.lhs));
+        code.add("    " + neg + " xmm0, [rel " + dat + "]");
+
+        if (dataMapping.containsKey(stmt.dst)) {
+            code.add("    " + mov + " " + dataMapping.get(stmt.dst) + ", xmm0");
+        } else {
+            final int bs = quad ? 8 : 4;
+            final String loc = String.format("%s [rbp - %d]", toWordSizeString(bs), (stackOffset += bs));
+            dataMapping.put(stmt.dst, loc);
+            code.add("    " + mov + " " + loc + ", xmm0");
         }
     }
 }
