@@ -90,6 +90,13 @@ public final class ConstantFoldPass implements Pass {
                         // This block will undo the previous substitution
                         // because register is modified and cached value is wrong
                         replacement.remove(stmt.dst.toString());
+                    } else if (stmt.op == Operation.REFER_VAR && replacement.containsKey(safeToString(stmt.lhs))) {
+                        // If folding was allowed, it will be creating a pointer out
+                        // of a non-memory-address (which is wrong!)
+                        //
+                        // Disable folding completely in this case since pointers can
+                        // be iffy when it comes to predicting values.
+                        replacement.remove(stmt.lhs.toString());
                     }
             }
         }
