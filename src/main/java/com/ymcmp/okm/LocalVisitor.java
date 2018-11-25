@@ -1408,6 +1408,13 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
             opcode = Operation.POINTER_GET;
         }
 
+        if (base.isFloatPoint()) {
+            switch (op) {
+                case ADD:   opcode = Operation.STORE_VAR; break;
+                case SUB:   opcode = base.getSize() == Double.SIZE ? Operation.DOUBLE_NEG : Operation.FLOAT_NEG; break;
+            }
+        }
+
         if (opcode == null) {
             throw new AssertionError("Compiler failed to synthesize " + op + " for " + base);
         }
