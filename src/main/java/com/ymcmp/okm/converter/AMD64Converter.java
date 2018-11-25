@@ -288,6 +288,12 @@ public class AMD64Converter implements Converter {
                         code.add("    mov " + loc + ", eax");
                     }
                     break;
+                case FLOAT_CMP:
+                    floatCmp(false, code, stmt);
+                    break;
+                case DOUBLE_CMP:
+                    floatCmp(true, code, stmt);
+                    break;
                 case LOAD_TRUE:
                     loadBoolean(true, code, stmt);
                     break;
@@ -661,6 +667,28 @@ public class AMD64Converter implements Converter {
             final String loc = String.format("%s [rbp - %d]", toWordSizeString(bs), (stackOffset += bs));
             dataMapping.put(stmt.dst, loc);
             code.add("    fstp " + loc);
+        }
+    }
+
+    private void floatCmp(boolean quad, List<String> code, Statement stmt) {
+        final String mov = quad ? "movsd" : "movss";
+        final String cmp = quad ? "ucomisd" : "ucomiss";
+        code.add("    xor ecx, ecx");
+        code.add("    " + mov + " xmm0, " + getNumber(stmt.lhs));
+        code.add("    " + mov + " xmm1, " + getNumber(stmt.rhs));
+        code.add("    " + cmp + " xmm0, xmm1");
+        code.add("    seta cl");
+        code.add("    " + cmp + " xmm1, xmm0");
+        code.add("    mov eax, -1");
+        code.add("    cmovbe eax, ecx");
+
+        if (dataMapping.containsKey(stmt.dst)) {
+            code.add("    mov " + dataMapping.get(stmt.dst) + ", eax");
+        } else {
+            // int is 4 bytes
+            final String loc = String.format("%s [rbp - %d]", toWordSizeString(4), (stackOffset += 4));
+            dataMapping.put(stmt.dst, loc);
+            code.add("    mov " + loc + ", eax");
         }
     }
 }
