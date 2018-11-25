@@ -18,6 +18,7 @@ import com.ymcmp.okm.tac.Statement;
 
 import com.ymcmp.okm.runtime.Machine;
 
+import com.ymcmp.okm.converter.Converter;
 import com.ymcmp.okm.converter.IRFormatter;
 import com.ymcmp.okm.converter.AMD64Converter;
 
@@ -84,18 +85,14 @@ public class App {
 
         if (argData.showIR) {
             final IRFormatter conv = new IRFormatter();
-            result.forEach((k, v) -> {
-                System.out.println(conv.convert(k, v));
-                System.out.println("");
-            });
+            result.forEach(conv::convert);
+            System.out.println(conv.getResult());
         }
 
         if (argData.toX86) {
             final AMD64Converter conv = new AMD64Converter();
-            result.forEach((k, v) -> {
-                System.out.println(conv.convert(k, v));
-                System.out.println("");
-            });
+            result.forEach(conv::convert);
+            System.out.println(conv.getResult());
         }
 
         if (argData.execIR) {
