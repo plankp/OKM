@@ -12,13 +12,20 @@ import com.ymcmp.okm.tac.Statement;
 
 public final class ConstantFoldPass implements Pass {
 
+    private final HashMap<String, Value> replacement = new HashMap<>();
+
+    @Override
+    public void reset() {
+        replacement.clear();
+    }
+
     @Override
     public void process(final String fname, final List<Statement> block) {
+        populateReplacement(block);
         handleJumpRange(fname, block, this::unfoldConstants);
     }
 
-    private void unfoldConstants(final String fname, final List<Statement> block) {
-        final HashMap<String, Value> replacement = new HashMap<>();
+    private void populateReplacement(final List<Statement> block) {
         for (int i = 0; i < block.size(); ++i) {
             final Statement stmt = block.get(i);
 
@@ -85,6 +92,12 @@ public final class ConstantFoldPass implements Pass {
                         replacement.remove(stmt.dst.toString());
                     }
             }
+        }
+    }
+
+    private void unfoldConstants(final String fname, final List<Statement> block) {
+        for (int i = 0; i < block.size(); ++i) {
+            final Statement stmt = block.get(i);
 
             final Value newLhs = replacement.getOrDefault(safeToString(stmt.lhs), stmt.lhs);
             final Value newRhs = replacement.getOrDefault(safeToString(stmt.rhs), stmt.rhs);
