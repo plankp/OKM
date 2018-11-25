@@ -182,6 +182,7 @@ public final class ConstantFoldPass implements Pass {
                     }
 
                     if (subst != null) {
+                        subst.setDataSize(stmt.getDataSize());
                         block.set(i--, subst);
                     }
                 }
@@ -223,6 +224,7 @@ public final class ConstantFoldPass implements Pass {
                     }
 
                     if (subst != null) {
+                        subst.setDataSize(stmt.getDataSize());
                         block.set(i--, subst);
                     }
                 }
