@@ -208,6 +208,12 @@ public class AMD64Converter implements Converter {
                 case LONG_MOD:
                     intDivMod(true, "rdx", code, stmt);
                     break;
+                case LONG_NEG:
+                    intUnary(true, "neg", code, stmt);
+                    break;
+                case LONG_CPL:
+                    intUnary(true, "not", code, stmt);
+                    break;
                 case INT_ADD:
                     intAdd(false, code, stmt);
                     break;
@@ -222,6 +228,12 @@ public class AMD64Converter implements Converter {
                     break;
                 case INT_MOD:
                     intDivMod(false, "edx", code, stmt);
+                    break;
+                case INT_NEG:
+                    intUnary(false, "neg", code, stmt);
+                    break;
+                case INT_CPL:
+                    intUnary(false, "not", code, stmt);
                     break;
                 case POP_PARAM_FLOAT: {
                     final int bs = stmt.getDataSize() / 8;
@@ -496,6 +508,21 @@ public class AMD64Converter implements Converter {
             case 7: return "xmm7";
         }
         throw new AssertionError("Invalid param slot: " + idx);
+    }
+
+    private void intUnary(boolean quad, String op, List<String> code, Statement stmt) {
+        final int bs = quad ? 8 : 4;
+        final String accum = getIntRegister(bs);
+        code.add("    mov " + accum + ", " + getNumber(stmt.lhs));
+        code.add("    " + op + " " + accum);
+
+        if (dataMapping.containsKey(stmt.dst)) {
+            code.add("    mov " + dataMapping.get(stmt.dst) + ", " + accum);
+        } else {
+            final String loc = String.format("%s [rbp - %d]", toWordSizeString(bs), (stackOffset += bs));
+            dataMapping.put(stmt.dst, loc);
+            code.add("    mov " + loc + ", " + accum);
+        }
     }
 
     private void intAdd(boolean eightBytes, List<String> code, Statement stmt) {
