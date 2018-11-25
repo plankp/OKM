@@ -163,79 +163,35 @@ public class AMD64Converter implements Converter {
                         code.add("    movsd " + loc + ", xmm0");
                     }
                     break;
+                case DOUBLE_ADD:
+                    floatSSEMath(true, "add", code, stmt);
+                    break;
+                case DOUBLE_SUB:
+                    floatSSEMath(true, "sub", code, stmt);
+                    break;
+                case DOUBLE_MUL:
+                    floatSSEMath(true, "mul", code, stmt);
+                    break;
+                case DOUBLE_DIV:
+                    floatSSEMath(true, "div", code, stmt);
+                    break;
+                case DOUBLE_MOD:
+                    floatFprem(true, code, stmt);
+                    break;
                 case FLOAT_ADD:
-                    // ADDSS <mem>, <mem> is not allowed. Dump #lhs to xmm0 then ADDSS xmm0, #rhs
-                    code.add("    movss xmm0, " + getNumber(stmt.lhs));
-                    code.add("    addss xmm0, " + getNumber(stmt.rhs));
-
-                    if (dataMapping.containsKey(stmt.dst)) {
-                        code.add("    movss " + dataMapping.get(stmt.dst) + ", xmm0");
-                    } else {
-                        // float is 32 bits, or 4 bytes
-                        final String loc = String.format("%s [rbp - %d]", toWordSizeString(4), (stackOffset += 4));
-                        dataMapping.put(stmt.dst, loc);
-                        code.add("    movss " + loc + ", xmm0");
-                    }
+                    floatSSEMath(false, "add", code, stmt);
                     break;
                 case FLOAT_SUB:
-                    // SUBSS <mem>, <mem> is not allowed. Dump #lhs to xmm0 then SUBSS xmm0, #rhs
-                    code.add("    movss xmm0, " + getNumber(stmt.lhs));
-                    code.add("    subss xmm0, " + getNumber(stmt.rhs));
-
-                    if (dataMapping.containsKey(stmt.dst)) {
-                        code.add("    movss " + dataMapping.get(stmt.dst) + ", xmm0");
-                    } else {
-                        // float is 32 bits, or 4 bytes
-                        final String loc = String.format("%s [rbp - %d]", toWordSizeString(4), (stackOffset += 4));
-                        dataMapping.put(stmt.dst, loc);
-                        code.add("    movss " + loc + ", xmm0");
-                    }
+                    floatSSEMath(false, "sub", code, stmt);
                     break;
                 case FLOAT_MUL:
-                    // MULSS <mem>, <mem> is not allowed. Dump #lhs to xmm0 then MULSS xmm0, #rhs
-                    code.add("    movss xmm0, " + getNumber(stmt.lhs));
-                    code.add("    mulss xmm0, " + getNumber(stmt.rhs));
-
-                    if (dataMapping.containsKey(stmt.dst)) {
-                        code.add("    movss " + dataMapping.get(stmt.dst) + ", xmm0");
-                    } else {
-                        // float is 32 bits, or 4 bytes
-                        final String loc = String.format("%s [rbp - %d]", toWordSizeString(4), (stackOffset += 4));
-                        dataMapping.put(stmt.dst, loc);
-                        code.add("    movss " + loc + ", xmm0");
-                    }
+                    floatSSEMath(false, "mul", code, stmt);
                     break;
                 case FLOAT_DIV:
-                    // DIVSS <mem>, <mem> is not allowed. Dump #lhs to xmm0 then DIVSS xmm0, #rhs
-                    code.add("    movss xmm0, " + getNumber(stmt.lhs));
-                    code.add("    divss xmm0, " + getNumber(stmt.rhs));
-
-                    if (dataMapping.containsKey(stmt.dst)) {
-                        code.add("    movss " + dataMapping.get(stmt.dst) + ", xmm0");
-                    } else {
-                        // float is 32 bits, or 4 bytes
-                        final String loc = String.format("%s [rbp - %d]", toWordSizeString(4), (stackOffset += 4));
-                        dataMapping.put(stmt.dst, loc);
-                        code.add("    movss " + loc + ", xmm0");
-                    }
+                    floatSSEMath(false, "div", code, stmt);
                     break;
                 case FLOAT_MOD:
-                    // use x87 instruction set for now, could switch to float fmodf(float, float) in C <math.h>
-                    code.add("    ;; ST(1) <- rhs");
-                    code.add("    fld " + getNumber(stmt.rhs));
-                    code.add("    ;; ST(0) <- lhs");
-                    code.add("    fld " + getNumber(stmt.lhs));
-                    code.add("    ;; ST(0) <- ST(0) % ST(1)");
-                    code.add("    fprem");
-
-                    if (dataMapping.containsKey(stmt.dst)) {
-                        code.add("    fstp " + dataMapping.get(stmt.dst));
-                    } else {
-                        // float is 32 bits, or 4 bytes
-                        final String loc = String.format("%s [rbp - %d]", toWordSizeString(4), (stackOffset += 4));
-                        dataMapping.put(stmt.dst, loc);
-                        code.add("    fstp " + loc);
-                    }
+                    floatFprem(false, code, stmt);
                     break;
                 case LONG_ADD:
                     intAdd(true, code, stmt);
@@ -671,6 +627,40 @@ public class AMD64Converter implements Converter {
             final String loc = String.format("%s [rbp - %d]", toWordSizeString(bs), (stackOffset += bs));
             dataMapping.put(stmt.dst, loc);
             code.add("    " + outOp + " " + loc + ", xmm1");
+        }
+    }
+
+    private void floatSSEMath(boolean quad, String opPrefix, List<String> code, Statement stmt) {
+        final String mov = quad ? "movsd": "movss";
+        final String add = opPrefix + (quad ? "sd": "ss");
+        code.add("    " + mov + " xmm0, " + getNumber(stmt.lhs));
+        code.add("    " + add + " xmm0, " + getNumber(stmt.rhs));
+
+        if (dataMapping.containsKey(stmt.dst)) {
+            code.add("    " + mov + " " + dataMapping.get(stmt.dst) + ", xmm0");
+        } else {
+            final int bs = quad ? 8 : 4;
+            final String loc = String.format("%s [rbp - %d]", toWordSizeString(bs), (stackOffset += bs));
+            dataMapping.put(stmt.dst, loc);
+            code.add("    " + mov + " " + loc + ", xmm0");
+        }
+    }
+
+    private void floatFprem(boolean quad, List<String> code, Statement stmt) {
+        code.add("    ;; ST(1) <- rhs");
+        code.add("    fld " + getNumber(stmt.rhs));
+        code.add("    ;; ST(0) <- lhs");
+        code.add("    fld " + getNumber(stmt.lhs));
+        code.add("    ;; ST(0) <- ST(0) % ST(1)");
+        code.add("    fprem");
+
+        if (dataMapping.containsKey(stmt.dst)) {
+            code.add("    fstp " + dataMapping.get(stmt.dst));
+        } else {
+            final int bs = quad ? 8 : 4;
+            final String loc = String.format("%s [rbp - %d]", toWordSizeString(bs), (stackOffset += bs));
+            dataMapping.put(stmt.dst, loc);
+            code.add("    fstp " + loc);
         }
     }
 }
