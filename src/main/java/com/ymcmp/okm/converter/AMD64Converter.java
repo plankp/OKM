@@ -138,6 +138,31 @@ public class AMD64Converter implements Converter {
                         code.add("    mov " + loc + ", edi");
                     }
                     break;
+                case CONV_INT_FLOAT:
+                    int2Float(false, false, code, stmt);
+                    break;
+                case CONV_LONG_FLOAT:
+                    int2Float(true, false, code, stmt);
+                    break;
+                case CONV_INT_DOUBLE:
+                    int2Float(false, true, code, stmt);
+                    break;
+                case CONV_LONG_DOUBLE:
+                    int2Float(true, true, code, stmt);
+                    break;
+                case CONV_FLOAT_DOUBLE:
+                    code.add("    movss xmm0, " + getNumber(stmt.lhs));
+                    code.add("    cvtss2sd xmm0, xmm0");
+
+                    if (dataMapping.containsKey(stmt.dst)) {
+                        code.add("    movsd " + dataMapping.get(stmt.dst) + ", xmm0");
+                    } else {
+                        // double is 8 bytes
+                        final String loc = String.format("%s [rbp - %d]", toWordSizeString(8), (stackOffset += 8));
+                        dataMapping.put(stmt.dst, loc);
+                        code.add("    movsd " + loc + ", xmm0");
+                    }
+                    break;
                 case FLOAT_ADD:
                     // ADDSS <mem>, <mem> is not allowed. Dump #lhs to xmm0 then ADDSS xmm0, #rhs
                     code.add("    movss xmm0, " + getNumber(stmt.lhs));
@@ -629,6 +654,23 @@ public class AMD64Converter implements Converter {
             final String loc = String.format("%s [rbp - %d]", toWordSizeString(1), (stackOffset += 1));
             dataMapping.put(stmt.dst, loc);
             code.add("    mov " + loc + ", " + k);
+        }
+    }
+
+    private void int2Float(boolean quadIn, boolean quadOut, List<String> code, Statement stmt) {
+        final String input = quadIn ? "rdi" : "edi";
+        final String convOp = quadOut ? "cvtsi2sd" : "cvtsi2ss";
+        final String outOp = quadOut ? "movsd" : "movss";
+        code.add("    mov " + input + ", " + getNumber(stmt.lhs));
+        code.add("    " + convOp + " xmm1, " + input);
+
+        if (dataMapping.containsKey(stmt.dst)) {
+            code.add("    " + outOp + " " + dataMapping.get(stmt.dst) + ", xmm1");
+        } else {
+            final int bs = quadOut ? 8 : 4;
+            final String loc = String.format("%s [rbp - %d]", toWordSizeString(bs), (stackOffset += bs));
+            dataMapping.put(stmt.dst, loc);
+            code.add("    " + outOp + " " + loc + ", xmm1");
         }
     }
 }
