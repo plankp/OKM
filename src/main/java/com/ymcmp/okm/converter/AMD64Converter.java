@@ -334,6 +334,18 @@ public class AMD64Converter implements Converter {
                     }
                     break;
                 }
+                case REFER_VAR:
+                    code.add("    lea rax, " + getNumber(stmt.lhs));
+
+                    // Pointers are 8 bytes
+                    if (dataMapping.containsKey(stmt.dst)) {
+                        code.add("    mov " + dataMapping.get(stmt.dst) + ", rax");
+                    } else {
+                        final String loc = String.format("[rbp - %d]", (stackOffset += 8));
+                        dataMapping.put(stmt.dst, loc);
+                        code.add("    mov " + loc + ", rax");
+                    }
+                    break;
                 case GOTO:
                     code.add("    jmp .L" + ((Label) stmt.dst).getAddress());
                     break;
@@ -435,7 +447,7 @@ public class AMD64Converter implements Converter {
                 return "[rel " + sectData.get(num).label + "]";
             }
             final String label = "_K" + sectData.size();
-            sectData.put(num, new DataValue(label, num.value));
+            sectData.put(num, new DataValue(label, toDataSizeString(bs) + " " + num.value));
             // Explicit relative addressing!
             return "[rel " + label + "]";
         }
