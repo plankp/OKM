@@ -257,7 +257,8 @@ public class Machine {
                         break;
                     case RETURN_UNIT:   //      <ignore>
                         return null;
-                    case RETURN_VALUE:  //      dst:result
+                    case RETURN_INT:    //      dst:result
+                    case RETURN_FLOAT:  //      dst:result
                         return fetchValue(stmt.dst);
                     case GOTO:          //      dst:jumpsite
                         i = ((Label) stmt.dst).getAddress() - 1;    // -1 because loop invariant

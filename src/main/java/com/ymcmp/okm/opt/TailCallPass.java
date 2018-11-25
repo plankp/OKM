@@ -19,7 +19,7 @@ public final class TailCallPass implements Pass {
                     final int nextAddr = getNextNonGotoOpAddress(block, i);
                     if (nextAddr < block.size()) {
                         final Statement next = block.get(nextAddr);
-                        if (next.op == Operation.RETURN_VALUE && safeEquals(stmt.dst, next.dst)) {
+                        if ((next.op == Operation.RETURN_INT || next.op == Operation.RETURN_FLOAT) && safeEquals(stmt.dst, next.dst)) {
                             // Next statement returns the result of this statement
                             block.set(i + 1, new Statement(Operation.NOP));
                             block.set(i--, new Statement(Operation.TAILCALL, stmt.lhs));
@@ -79,7 +79,8 @@ public final class TailCallPass implements Pass {
                         final Statement next = block.get(nextAddr);
                         switch (next.op) {
                             case RETURN_UNIT:
-                            case RETURN_VALUE:
+                            case RETURN_INT:
+                            case RETURN_FLOAT:
                                 // Instead of goto a return, just return directly
                                 block.set(i--, next);
                                 break;

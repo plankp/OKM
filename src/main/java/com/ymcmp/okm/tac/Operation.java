@@ -86,7 +86,8 @@ public enum Operation {
     PUT_ATTR,
 
     RETURN_UNIT,
-    RETURN_VALUE,
+    RETURN_INT,
+    RETURN_FLOAT,
 
     GOTO,
 
@@ -119,7 +120,8 @@ public enum Operation {
             case PUT_ATTR:
             case DEREF_PUT_ATTR:
             case CALL_UNIT:
-            case RETURN_VALUE:
+            case RETURN_INT:
+            case RETURN_FLOAT:
             case TAILCALL:
                 return true;
             default:
@@ -132,7 +134,8 @@ public enum Operation {
             case GOTO:
             case TAILCALL:
             case RETURN_UNIT:
-            case RETURN_VALUE:
+            case RETURN_INT:
+            case RETURN_FLOAT:
             case JUMP_IF_TRUE:
             case JUMP_IF_FALSE:
                 return true;

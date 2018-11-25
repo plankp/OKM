@@ -582,7 +582,8 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
             stmt = new Statement(Operation.RETURN_UNIT);
         } else {
             final Value onStack = VALUE_STACK.pop();
-            stmt = new Statement(Operation.RETURN_VALUE, insertConversion(onStack, valueType, conformingType));
+            stmt = new Statement(valueType.isFloatPoint() ? Operation.RETURN_FLOAT : Operation.RETURN_INT, insertConversion(onStack, valueType, conformingType));
+            stmt.setDataSize(valueType.getSize());
         }
         funcStmts.add(stmt);
     }
