@@ -141,19 +141,91 @@ public final class ConstantFoldPass implements Pass {
                 final Fixnum lhs = (Fixnum) stmt.lhs;
                 if (lhs.isInt) {
                     final long a = Long.parseLong(lhs.value);
-                    final long result;
+                    Statement subst = null;
                     switch (stmt.op) {
-                        case INT_NEG: case LONG_NEG: result = -a; break;
-                        case INT_CPL: case LONG_CPL: result = ~a; break;
-                        default:
-                            // Not optimizable, not an error, just ignore
-                            continue;
+                        case INT_ADD: case LONG_ADD:
+                            if (a == 0) {
+                                subst = new Statement(Operation.STORE_VAR, stmt.rhs, stmt.dst);
+                            }
+                            break;
+                        case INT_SUB:
+                            if (a == 0) {
+                                subst = new Statement(Operation.INT_NEG, stmt.rhs, stmt.dst);
+                            }
+                            break;
+                        case LONG_SUB:
+                            if (a == 0) {
+                                subst = new Statement(Operation.LONG_NEG, stmt.rhs, stmt.dst);
+                            }
+                            break;
+                        case INT_MUL: case LONG_MUL:
+                            if (a == 0) {
+                                subst = new Statement(Operation.LOAD_NUMERAL, new Fixnum(0, lhs.size), stmt.dst);
+                            }
+                            break;
+                        case INT_DIV: case LONG_DIV:
+                            if (a == 0) {
+                                subst = new Statement(Operation.LOAD_NUMERAL, new Fixnum(0, lhs.size), stmt.dst);
+                            }
+                            break;
+                        case INT_MOD: case LONG_MOD:
+                            if (a == 0) {
+                                subst = new Statement(Operation.LOAD_NUMERAL, new Fixnum(0, lhs.size), stmt.dst);
+                            }
+                            break;
+                        case INT_NEG: case LONG_NEG:
+                            subst = new Statement(Operation.LOAD_NUMERAL, new Fixnum(-a, lhs.size), stmt.dst);
+                            break;
+                        case INT_CPL: case LONG_CPL:
+                            subst = new Statement(Operation.LOAD_NUMERAL, new Fixnum(~a, lhs.size), stmt.dst);
+                            break;
                     }
-                    final Statement repl = new Statement(Operation.LOAD_NUMERAL, new Fixnum(result, lhs.size), stmt.dst);
-                    repl.setDataSize(lhs.size);
-                    block.set(i--, repl);
+
+                    if (subst != null) {
+                        block.set(i--, subst);
+                    }
                 }
                 continue;
+            }
+
+            if (safeIsNumeric(stmt.rhs)) {
+                final Fixnum rhs = (Fixnum) stmt.rhs;
+                if (rhs.isInt) {
+                    final long a = Long.parseLong(rhs.value);
+                    Statement subst = null;
+                    if (a == 0) {
+                        switch (stmt.op) {
+                            case INT_ADD: case LONG_ADD:
+                                subst = new Statement(Operation.STORE_VAR, stmt.lhs, stmt.dst);
+                                break;
+                            case INT_SUB: case LONG_SUB:
+                                subst = new Statement(Operation.STORE_VAR, stmt.lhs, stmt.dst);
+                                break;
+                            case INT_MUL: case LONG_MUL:
+                                subst = new Statement(Operation.LOAD_NUMERAL, new Fixnum(0, rhs.size), stmt.dst);
+                                break;
+                            case INT_DIV: case LONG_DIV:
+                            case INT_MOD: case LONG_MOD:
+                                throw new RuntimeException("Divide by zero on " + stmt);
+                        }
+                    } else if (a == 1) {
+                        switch (stmt.op) {
+                            case INT_MUL: case LONG_MUL:
+                                subst = new Statement(Operation.STORE_VAR, stmt.lhs, stmt.dst);
+                                break;
+                            case INT_DIV: case LONG_DIV:
+                                subst = new Statement(Operation.STORE_VAR, stmt.lhs, stmt.dst);
+                                break;
+                            case INT_MOD: case LONG_MOD:
+                                subst = new Statement(Operation.LOAD_NUMERAL, new Fixnum(0, rhs.size), stmt.dst);
+                                break;
+                        }
+                    }
+
+                    if (subst != null) {
+                        block.set(i--, subst);
+                    }
+                }
             }
         }
     }
