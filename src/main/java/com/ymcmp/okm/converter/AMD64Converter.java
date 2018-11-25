@@ -74,6 +74,9 @@ public class AMD64Converter implements Converter {
             code.add("  .L" + i + ":");
 
             switch (stmt.op) {
+                case NOP:
+                    // Does nothing!
+                    break;
                 case CONV_BYTE_INT:
                 case CONV_SHORT_INT:
                     code.add("    movsx edi, " + getNumber(stmt.lhs));
