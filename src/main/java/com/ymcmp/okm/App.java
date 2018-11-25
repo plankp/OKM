@@ -41,8 +41,8 @@ public class App {
         @Parameter(names={"--exec-ir"}, description="Executes intermediate representation after compilation")
         private boolean execIR = false;
 
-        @Parameter(names={"--to-x86"}, description="Converts IR to x86 Intel syntax assembly")
-        private boolean toX86 = false;
+        @Parameter(names={"--to-amd64"}, description="Converts IR to x86-64 Intel syntax assembly (use with NASM)")
+        private boolean toAMD64 = false;
 
         @Parameter(names={"--help", "-h"}, description="Displays help")
         private boolean help = false;
@@ -89,7 +89,7 @@ public class App {
             System.out.println(conv.getResult());
         }
 
-        if (argData.toX86) {
+        if (argData.toAMD64) {
             final AMD64Converter conv = new AMD64Converter();
             result.forEach(conv::convert);
             System.out.println(conv.getResult());
