@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.stream.Stream;
 import java.util.stream.Collectors;
 
+import com.ymcmp.okm.tac.Label;
 import com.ymcmp.okm.tac.Value;
 import com.ymcmp.okm.tac.Fixnum;
 import com.ymcmp.okm.tac.Operation;
@@ -75,7 +76,7 @@ public class AMD64Converter implements Converter {
             switch (stmt.op) {
                 case CONV_BYTE_INT:
                 case CONV_SHORT_INT:
-                    code.add("    movsx edi, " + getNumber(dataMapping, stmt.lhs));
+                    code.add("    movsx edi, " + getNumber(stmt.lhs));
 
                     if (dataMapping.containsKey(stmt.dst)) {
                         code.add("    mov " + dataMapping.get(stmt.dst) + ", edi");
@@ -87,7 +88,7 @@ public class AMD64Converter implements Converter {
                     }
                     break;
                 case CONV_INT_LONG:
-                    code.add("    movsxd rdi, " + getNumber(dataMapping, stmt.lhs));
+                    code.add("    movsxd rdi, " + getNumber(stmt.lhs));
 
                     if (dataMapping.containsKey(stmt.dst)) {
                         code.add("    mov " + dataMapping.get(stmt.dst) + ", rdi");
@@ -99,7 +100,7 @@ public class AMD64Converter implements Converter {
                     }
                     break;
                 case CONV_INT_BYTE:
-                    code.add("    mov edi, " + getNumber(dataMapping, stmt.lhs));
+                    code.add("    mov edi, " + getNumber(stmt.lhs));
 
                     if (dataMapping.containsKey(stmt.dst)) {
                         code.add("    mov " + dataMapping.get(stmt.dst) + ", dil");
@@ -111,7 +112,7 @@ public class AMD64Converter implements Converter {
                     }
                     break;
                 case CONV_INT_SHORT:
-                    code.add("    mov edi, " + getNumber(dataMapping, stmt.lhs));
+                    code.add("    mov edi, " + getNumber(stmt.lhs));
 
                     if (dataMapping.containsKey(stmt.dst)) {
                         code.add("    mov " + dataMapping.get(stmt.dst) + ", di");
@@ -123,7 +124,7 @@ public class AMD64Converter implements Converter {
                     }
                     break;
                 case CONV_LONG_INT:
-                    code.add("    mov rdi, " + getNumber(dataMapping, stmt.lhs));
+                    code.add("    mov rdi, " + getNumber(stmt.lhs));
 
                     if (dataMapping.containsKey(stmt.dst)) {
                         code.add("    mov " + dataMapping.get(stmt.dst) + ", edi");
@@ -136,8 +137,8 @@ public class AMD64Converter implements Converter {
                     break;
                 case FLOAT_ADD:
                     // ADDSS <mem>, <mem> is not allowed. Dump #lhs to xmm0 then ADDSS xmm0, #rhs
-                    code.add("    movss xmm0, " + getNumber(dataMapping, stmt.lhs));
-                    code.add("    addss xmm0, " + getNumber(dataMapping, stmt.rhs));
+                    code.add("    movss xmm0, " + getNumber(stmt.lhs));
+                    code.add("    addss xmm0, " + getNumber(stmt.rhs));
 
                     if (dataMapping.containsKey(stmt.dst)) {
                         code.add("    movss " + dataMapping.get(stmt.dst) + ", xmm0");
@@ -150,8 +151,8 @@ public class AMD64Converter implements Converter {
                     break;
                 case FLOAT_SUB:
                     // SUBSS <mem>, <mem> is not allowed. Dump #lhs to xmm0 then SUBSS xmm0, #rhs
-                    code.add("    movss xmm0, " + getNumber(dataMapping, stmt.lhs));
-                    code.add("    subss xmm0, " + getNumber(dataMapping, stmt.rhs));
+                    code.add("    movss xmm0, " + getNumber(stmt.lhs));
+                    code.add("    subss xmm0, " + getNumber(stmt.rhs));
 
                     if (dataMapping.containsKey(stmt.dst)) {
                         code.add("    movss " + dataMapping.get(stmt.dst) + ", xmm0");
@@ -164,8 +165,8 @@ public class AMD64Converter implements Converter {
                     break;
                 case FLOAT_MUL:
                     // MULSS <mem>, <mem> is not allowed. Dump #lhs to xmm0 then MULSS xmm0, #rhs
-                    code.add("    movss xmm0, " + getNumber(dataMapping, stmt.lhs));
-                    code.add("    mulss xmm0, " + getNumber(dataMapping, stmt.rhs));
+                    code.add("    movss xmm0, " + getNumber(stmt.lhs));
+                    code.add("    mulss xmm0, " + getNumber(stmt.rhs));
 
                     if (dataMapping.containsKey(stmt.dst)) {
                         code.add("    movss " + dataMapping.get(stmt.dst) + ", xmm0");
@@ -178,8 +179,8 @@ public class AMD64Converter implements Converter {
                     break;
                 case FLOAT_DIV:
                     // DIVSS <mem>, <mem> is not allowed. Dump #lhs to xmm0 then DIVSS xmm0, #rhs
-                    code.add("    movss xmm0, " + getNumber(dataMapping, stmt.lhs));
-                    code.add("    divss xmm0, " + getNumber(dataMapping, stmt.rhs));
+                    code.add("    movss xmm0, " + getNumber(stmt.lhs));
+                    code.add("    divss xmm0, " + getNumber(stmt.rhs));
 
                     if (dataMapping.containsKey(stmt.dst)) {
                         code.add("    movss " + dataMapping.get(stmt.dst) + ", xmm0");
@@ -193,9 +194,9 @@ public class AMD64Converter implements Converter {
                 case FLOAT_MOD:
                     // use x87 instruction set for now, could switch to float fmodf(float, float) in C <math.h>
                     code.add("    ;; ST(1) <- rhs");
-                    code.add("    fld " + getNumber(dataMapping, stmt.rhs));
+                    code.add("    fld " + getNumber(stmt.rhs));
                     code.add("    ;; ST(0) <- lhs");
-                    code.add("    fld " + getNumber(dataMapping, stmt.lhs));
+                    code.add("    fld " + getNumber(stmt.lhs));
                     code.add("    ;; ST(0) <- ST(0) % ST(1)");
                     code.add("    fprem");
 
@@ -268,12 +269,79 @@ public class AMD64Converter implements Converter {
                     ++intParam;
                     break;
                 }
+                case INT_LT:
+                    genericIntCmp("setl", code, stmt);
+                    break;
+                case INT_GT:
+                    genericIntCmp("setg", code, stmt);
+                    break;
+                case INT_LE:
+                    genericIntCmp("setle", code, stmt);
+                    break;
+                case INT_GE:
+                    genericIntCmp("setge", code, stmt);
+                    break;
+                case INT_EQ:
+                    genericIntCmp("sete", code, stmt);
+                    break;
+                case INT_NE:
+                    genericIntCmp("setne", code, stmt);
+                    break;
+                case LONG_CMP:
+                    code.add("    xor ecx, ecx");
+                    code.add("    mov rax, " + getNumber(stmt.lhs));
+                    code.add("    cmp rax, " + getNumber(stmt.rhs));
+                    code.add("    setg cl");
+                    code.add("    mov eax, -1");
+                    code.add("    cmovge eax, ecx");
+
+                    if (dataMapping.containsKey(stmt.dst)) {
+                        code.add("    mov " + dataMapping.get(stmt.dst) + ", eax");
+                    } else {
+                        // int is 4 bytes
+                        final String loc = String.format("%s [rbp - %d]", toWordSizeString(4), (stackOffset += 4));
+                        dataMapping.put(stmt.dst, loc);
+                        code.add("    mov " + loc + ", eax");
+                    }
+                    break;
+                case LOAD_TRUE:
+                    loadBoolean(true, code, stmt);
+                    break;
+                case LOAD_FALSE:
+                    loadBoolean(false, code, stmt);
+                    break;
+                case LOAD_NUMERAL:
+                case STORE_VAR: {
+                    final int bs = stmt.getDataSize() / 8;
+                    final String tmp = getIntRegister(bs);
+                    code.add("    xor rax, rax");
+                    code.add("    mov " + tmp + ", " + getNumber(stmt.lhs));
+                    if (dataMapping.containsKey(stmt.dst)) {
+                        code.add("    mov " + dataMapping.get(stmt.dst) + ", " + tmp);
+                    } else {
+                        final String loc = String.format("%s [rbp - %d]", toWordSizeString(bs), (stackOffset += bs));
+                        dataMapping.put(stmt.dst, loc);
+                        code.add("    mov " + loc + ", " + tmp);
+                    }
+                    break;
+                }
+                case GOTO:
+                    code.add("    jmp .L" + ((Label) stmt.dst).getAddress());
+                    break;
+                case JUMP_IF_TRUE:
+                    code.add("    cmp " + getNumber(stmt.lhs) + ", 0");
+                    code.add("    jne .L" + ((Label) stmt.dst).getAddress());
+                    break;
+                case JUMP_IF_FALSE:
+                    code.add("    cmp " + getNumber(stmt.lhs) + ", 0");
+                    code.add("    je .L" + ((Label) stmt.dst).getAddress());
+                    break;
                 case RETURN_FLOAT:
-                    code.add("    " + (stmt.getDataSize() / 8 == 4 ? "movss" : "movsd") + " xmm0, " + getNumber(dataMapping, stmt.dst));
+                    code.add("    " + (stmt.getDataSize() / 8 == 4 ? "movss" : "movsd") + " xmm0, " + getNumber(stmt.dst));
                     generateFuncEpilogue(code);
                     break;
                 case RETURN_INT: {
-                    final String src = getNumber(dataMapping, stmt.dst);
+                    final String src = getNumber(stmt.dst);
                     switch (stmt.getDataSize() / 8) {
                         case 1:
                             code.add("    movsx eax, " + src);
@@ -342,7 +410,7 @@ public class AMD64Converter implements Converter {
         return ((int) ((a + b - 1) / b) + 1) * b;
     }
 
-    private String getNumber(Map<Value, String> mapping, Value v) {
+    private String getNumber(final Value v) {
         if (v.isNumeric()) {
             final Fixnum num = (Fixnum) v;
             if (num.isInt) {
@@ -359,7 +427,7 @@ public class AMD64Converter implements Converter {
             // Explicit relative addressing!
             return toWordSizeString(bs) + " [rel " + label + "]";
         }
-        return mapping.get(v);
+        return dataMapping.get(v);
     }
 
     private static String getIntRegister(int size) {
@@ -443,8 +511,8 @@ public class AMD64Converter implements Converter {
     private void genericAdd(boolean eightBytes, List<String> code, Statement stmt) {
         final int bs = eightBytes ? 8 : 4;
         final String accum = getIntRegister(bs);
-        code.add("    mov " + accum + ", " + getNumber(dataMapping, stmt.lhs));
-        code.add("    add " + accum + ", " + getNumber(dataMapping, stmt.rhs));
+        code.add("    mov " + accum + ", " + getNumber(stmt.lhs));
+        code.add("    add " + accum + ", " + getNumber(stmt.rhs));
 
         if (dataMapping.containsKey(stmt.dst)) {
             code.add("    mov " + dataMapping.get(stmt.dst) + ", " + accum);
@@ -458,8 +526,8 @@ public class AMD64Converter implements Converter {
     private void genericSub(boolean eightBytes, List<String> code, Statement stmt) {
         final int bs = eightBytes ? 8 : 4;
         final String accum = getIntRegister(bs);
-        code.add("    mov " + accum + ", " + getNumber(dataMapping, stmt.lhs));
-        code.add("    sub " + accum + ", " + getNumber(dataMapping, stmt.rhs));
+        code.add("    mov " + accum + ", " + getNumber(stmt.lhs));
+        code.add("    sub " + accum + ", " + getNumber(stmt.rhs));
 
         if (dataMapping.containsKey(stmt.dst)) {
             code.add("    mov " + dataMapping.get(stmt.dst) + ", " + accum);
@@ -473,7 +541,7 @@ public class AMD64Converter implements Converter {
     private void genericMul(boolean eightBytes, List<String> code, Statement stmt) {
         final int bs = eightBytes ? 8 : 4;
         final String accum = getIntRegister(bs);
-        code.add("    mov "+ accum + ", " + getNumber(dataMapping, stmt.lhs));
+        code.add("    mov "+ accum + ", " + getNumber(stmt.lhs));
         if (stmt.rhs.isNumeric()) {
             // IMUL <imm> is not a thing
             final String scale = ((Fixnum) stmt.rhs).value;
@@ -512,7 +580,7 @@ public class AMD64Converter implements Converter {
         final int bs = eightBytes ? 8 : 4;
         final String accum = getIntRegister(bs);
 
-        code.add("    mov " + accum + ", " + getNumber(dataMapping, stmt.lhs));
+        code.add("    mov " + accum + ", " + getNumber(stmt.lhs));
         code.add("    " + (eightBytes ? "cqo" : "cdq"));
         if (stmt.rhs.isNumeric()) {
             // IDIV <imm> is not a thing
@@ -530,6 +598,34 @@ public class AMD64Converter implements Converter {
             final String loc = String.format("%s [rbp - %d]", toWordSizeString(bs), (stackOffset += bs));
             dataMapping.put(stmt.dst, loc);
             code.add("    mov " + loc + ", " + resultReg);
+        }
+    }
+
+    private void genericIntCmp(String cmpInstr, List<String> code, Statement stmt) {
+        code.add("    xor ecx, ecx");
+        code.add("    mov eax, " + getNumber(stmt.lhs));
+        code.add("    cmp eax, " + getNumber(stmt.rhs));
+        code.add("    " + cmpInstr + " cl");
+
+        if (dataMapping.containsKey(stmt.dst)) {
+            code.add("    mov " + dataMapping.get(stmt.dst) + ", ecx");
+        } else {
+            // int is 4 bytes
+            final String loc = String.format("%s [rbp - %d]", toWordSizeString(4), (stackOffset += 4));
+            dataMapping.put(stmt.dst, loc);
+            code.add("    mov " + loc + ", ecx");
+        }
+    }
+
+    private void loadBoolean(boolean value, List<String> code, Statement stmt) {
+        final String k = value ? "1" : "0";
+        if (dataMapping.containsKey(stmt.dst)) {
+            code.add("    mov " + dataMapping.get(stmt.dst) + ", " + k);
+        } else {
+            // bool is 1 byte
+            final String loc = String.format("%s [rbp - %d]", toWordSizeString(1), (stackOffset += 1));
+            dataMapping.put(stmt.dst, loc);
+            code.add("    mov " + loc + ", " + k);
         }
     }
 }
