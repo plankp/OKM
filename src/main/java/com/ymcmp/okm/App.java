@@ -38,7 +38,7 @@ public class App {
         @Parameter(names={"--show-ir"}, description="Shows intermediate representation after compilation", arity=1)
         private boolean showIR = true;
 
-        @Parameter(names={"--exec-ir"}, description="Executes intermediate representation after compilation", arity=1)
+        @Parameter(names={"--exec-ir"}, description="Executes intermediate representation after compilation")
         private boolean execIR = false;
 
         @Parameter(names={"--to-x86"}, description="Converts IR to x86 Intel syntax assembly")
