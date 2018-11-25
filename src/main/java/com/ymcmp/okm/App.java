@@ -19,7 +19,7 @@ import com.ymcmp.okm.tac.Statement;
 import com.ymcmp.okm.runtime.Machine;
 
 import com.ymcmp.okm.converter.IRFormatter;
-import com.ymcmp.okm.converter.X86Converter;
+import com.ymcmp.okm.converter.AMD64Converter;
 
 public class App {
 
@@ -91,7 +91,7 @@ public class App {
         }
 
         if (argData.toX86) {
-            final X86Converter conv = new X86Converter();
+            final AMD64Converter conv = new AMD64Converter();
             result.forEach((k, v) -> {
                 System.out.println(conv.convert(k, v));
                 System.out.println("");
