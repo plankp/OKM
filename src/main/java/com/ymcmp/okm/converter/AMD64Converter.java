@@ -72,7 +72,16 @@ public class AMD64Converter implements Converter {
         dataMapping.clear();
         stackOffset = 0;
 
-        funcPrologue.add(mangleName(name) + ":");
+        if (name.equals("@init")) {
+            // This is the equivalent of the int main function in C
+            funcPrologue.add("    global _main");
+            funcPrologue.add("_main:");
+
+            // Explicitly clear out eax register at the end
+            funcEpilogue.add("    xor eax, eax");
+        } else {
+            funcPrologue.add(mangleName(name) + ":");
+        }
         funcPrologue.add("    ;;@ prologue");
         funcPrologue.add("    push rbp");
         funcPrologue.add("    mov rbp, rsp");
