@@ -346,6 +346,25 @@ public class AMD64Converter implements Converter {
                         code.add("    mov " + loc + ", rax");
                     }
                     break;
+                case POINTER_GET: {
+                    final int bs = stmt.getDataSize() / 8;
+                    final String tmp = getIntRegister(bs);
+                    code.add("    mov rax, " + getNumber(stmt.lhs));
+                    code.add("    mov " + tmp + ", [rax]");
+                    
+                    if (dataMapping.containsKey(stmt.dst)) {
+                        code.add("    mov " + dataMapping.get(stmt.dst) + ", " + tmp);
+                    } else {
+                        final String loc = String.format("[rbp - %d]", (stackOffset += bs));
+                        dataMapping.put(stmt.dst, loc);
+                        code.add("    mov " + loc + ", " + tmp);
+                    }
+                    break;
+                }
+                case POINTER_PUT:
+                    code.add("    mov rax, " + getNumber(stmt.dst));
+                    code.add("    mov " + toWordSizeString(stmt.getDataSize() / 8) + " [rax], " + getNumber(stmt.lhs));
+                    break;
                 case GOTO:
                     code.add("    jmp .L" + ((Label) stmt.dst).getAddress());
                     break;
