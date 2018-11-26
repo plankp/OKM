@@ -9,7 +9,7 @@ import java.util.List;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.ArrayList;
-import java.util.ArrayDeque;
+import java.util.LinkedList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 
@@ -100,7 +100,7 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
     private final List<Path> SEARCH_PATH;
 
     private final Map<Path, Module> LOADED_MODULES = new HashMap<>();
-    private final ArrayDeque<Value> VALUE_STACK = new ArrayDeque<>();
+    private final LinkedList<Value> VALUE_STACK = new LinkedList<>();
 
     private final Map<String, List<Statement>> RESULT = new LinkedHashMap<>();
     private final List<String> MODULE_INITS = new ArrayList<>();
@@ -839,6 +839,9 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
             throw new UndefinedOperationException("Type " + base + " cannot be called with arguments: " + Arrays.toString(args));
         }
 
+        // Hack the value stack so it reorients into reverse order
+        Collections.reverse(VALUE_STACK.subList(0, args.length));
+
         // Try to perform the correct type conversions then push from right to left
         final FuncType ftype = (base instanceof FuncType) ? (FuncType) base : null;
         for (int i = 0; i < args.length; ++i) {
@@ -848,7 +851,7 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
             if (ftype != null) {
                 val = insertConversion(val, argType, (paramType = ftype.params[i]));
             }
-            final Statement stmt = new Statement(Operation.PUSH_PARAM, val);
+            final Statement stmt = new Statement(paramType.isFloatPoint() ? Operation.PUSH_PARAM_FLOAT : Operation.PUSH_PARAM_INT, val);
             stmt.setDataSize(paramType.getSize());
             funcStmts.add(stmt);
         }
@@ -861,7 +864,7 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
             stmt = new Statement(Operation.CALL_UNIT, VALUE_STACK.pop());
         } else {
             temporary = Register.makeTemporary();
-            stmt = new Statement(Operation.CALL, VALUE_STACK.pop(), temporary);
+            stmt = new Statement(result.isFloatPoint() ? Operation.CALL_FLOAT : Operation.CALL_INT, VALUE_STACK.pop(), temporary);
             stmt.setDataSize(result.getSize());
         }
         funcStmts.add(stmt);
