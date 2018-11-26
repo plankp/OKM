@@ -486,11 +486,75 @@ public class AMD64Converter implements Converter {
                     ++pushFloatParam;
                     break;
                 }
+                case ALLOC_STRUCT: {
+                    // Acquire a pointer to the start of the struct
+                    code.add("    lea rax, [rbp - " + stackOffset + "]");
+                    stackOffset += stmt.getDataSize() / 8;
+
+                    if (dataMapping.containsKey(stmt.dst)) {
+                        code.add("    mov " + dataMapping.get(stmt.dst) + ", rax");
+                    } else {
+                        final String loc = String.format("[rbp - %d]", (stackOffset += 8));
+                        dataMapping.put(stmt.dst, loc);
+                        code.add("    mov " + loc + ", rax");
+                    }
+                    break;
+                }
+                case PUT_ATTR: {
+                    // dst is the value being dumped into the struct
+                    // lhs is the pointer of the struct
+                    // rhs is the offset we are working with!
+                    final int bs = stmt.getDataSize() / 8;
+                    final String tmp = getIntRegister(bs);
+                    final StringBuilder structHead = new StringBuilder(getNumber(stmt.lhs));
+                    structHead
+                            .insert(structHead.length() - 1, " + ")
+                            .insert(structHead.length() - 1, Long.parseLong(((Fixnum) stmt.rhs).value) / 8);
+
+                    code.add("    mov " + tmp + ", " + getNumber(stmt.dst));
+                    code.add("    mov " + structHead + ", " + tmp);
+                    break;
+                }
+                case GET_ATTR: {
+                    // dst is the output
+                    // lhs is the pointer of the struct
+                    // rhs is the offset we are working with!
+                    final int bs = stmt.getDataSize() / 8;
+                    final String tmp = getIntRegister(bs);
+                    final StringBuilder structHead = new StringBuilder(getNumber(stmt.lhs));
+                    structHead
+                            .insert(structHead.length() - 1, " + ")
+                            .insert(structHead.length() - 1, Long.parseLong(((Fixnum) stmt.rhs).value) / 8);
+
+                    code.add("    mov " + tmp + ", " + structHead);
+                    
+                    if (dataMapping.containsKey(stmt.dst)) {
+                        code.add("    mov " + dataMapping.get(stmt.dst) + ", " + tmp);
+                    } else {
+                        final String loc = String.format("[rbp - %d]", (stackOffset += bs));
+                        dataMapping.put(stmt.dst, loc);
+                        code.add("    mov " + loc + ", " + tmp);
+                    }
+                    break;
+                }
                 default:
                     code.add(stmt.toString());
                     break;
             }
         }
+
+        /*
+        Unimplemented opcodes:
+          REFER_ATTR
+          DEREF_GET_ATTR
+          DEREF_PUT_ATTR
+          ALLOC_STRUCT
+
+        Missing features:
+          Instrinsics and Standard Library (conditional compilation?)
+          GAS supporting output (.intel_syntax noprefix)
+          Optimizer?
+        */
 
         if (moveRSP) {
             final int relocate = roundToNextDivisible(stackOffset, 16);
