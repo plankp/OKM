@@ -1352,7 +1352,7 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
             stmt = new Statement(
                     isPointer ? Operation.DEREF_GET_ATTR : Operation.GET_ATTR,
                     VALUE_STACK.pop(),
-                    Register.makeNamed(attr),
+                    new Fixnum(((StructType) base).getOffsetOfField(attr)),
                     temporary);
         }
         stmt.setDataSize(result.getSize());
