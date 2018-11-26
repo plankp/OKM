@@ -51,7 +51,8 @@ public final class EliminateNopPass implements Pass {
                     continue;
                 }
                 case RETURN_UNIT:
-                case RETURN_VALUE:
+                case RETURN_INT:
+                case RETURN_FLOAT:
                     // Special case of GOTO's example: everything after this
                     // instruction can be purged
                     purgeUnreachedCode(block, labels, i, block.size());

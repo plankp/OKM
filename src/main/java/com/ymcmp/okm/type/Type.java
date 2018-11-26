@@ -6,6 +6,10 @@ public interface Type {
 
     public Type allocate();
 
+    public default boolean isFloatPoint() {
+        return false;
+    }
+
     public boolean isSameType(Type t);
 
     public default boolean canConvertTo(Type t) {

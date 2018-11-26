@@ -69,6 +69,17 @@ public final class UnaryType implements Type {
     }
 
     @Override
+    public boolean isFloatPoint() {
+        switch (name) {
+            case "float":
+            case "double":
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    @Override
     public boolean canConvertTo(Type t) {
         if (t instanceof UnaryType) {
             final UnaryType other = (UnaryType) t;

@@ -4,6 +4,7 @@ import java.util.Map;
 import java.util.List;
 import java.util.Stack;
 import java.util.HashMap;
+import java.util.Collections;
 
 import com.ymcmp.okm.tac.*;
 
@@ -16,9 +17,29 @@ public class Machine {
         // Call the initializer if it exists
         final List<Statement> initializer = code.get("@init");
         if (initializer != null) {
+            preprocess(code);
             return execute(code, initializer);
         }
         return null;
+    }
+
+    private void preprocess(final Map<String, List<Statement>> code) {
+        code.forEach((k, v) -> {
+            // Reorder pop param statements
+            int upperBound = 0;
+            loop:
+            for (int i = 0; i < v.size(); ++i) {
+                switch (v.get(i).op) {
+                    case POP_PARAM_INT:
+                    case POP_PARAM_FLOAT:
+                        ++upperBound;
+                        break;
+                    default:
+                        break loop;
+                }
+            }
+            Collections.reverse(v.subList(0, upperBound));
+        });
     }
 
     private Value execute(final Map<String, List<Statement>> code, final String funcName) {
@@ -257,7 +278,8 @@ public class Machine {
                         break;
                     case RETURN_UNIT:   //      <ignore>
                         return null;
-                    case RETURN_VALUE:  //      dst:result
+                    case RETURN_INT:    //      dst:result
+                    case RETURN_FLOAT:  //      dst:result
                         return fetchValue(stmt.dst);
                     case GOTO:          //      dst:jumpsite
                         i = ((Label) stmt.dst).getAddress() - 1;    // -1 because loop invariant
@@ -272,14 +294,17 @@ public class Machine {
                             i = ((Label) stmt.dst).getAddress() - 1;    // -1 because loop invariant
                         }
                         break;
-                    case POP_PARAM:     //      dst:store
+                    case POP_PARAM_INT: //      dst:store
+                    case POP_PARAM_FLOAT: //    dst:store
                         locals.put(stmt.dst, callStack.pop());
                         break;
-                    case PUSH_PARAM:    //      dst:value
+                    case PUSH_PARAM_INT: //     dst:value
+                    case PUSH_PARAM_FLOAT: //   dst:value
                         // Pass by value, (including structs)
                         callStack.push(fetchValue(stmt.dst).duplicate());
                         break;
-                    case CALL:          //      dst:store, lhs:callsite
+                    case CALL_INT:      //      dst:store, lhs:callsite
+                    case CALL_FLOAT:    //      dst:store, lhs:callsite
                         locals.put(stmt.dst, execute(code, fetchValue(stmt.lhs).toString()));
                         break;
                     case CALL_UNIT:     //      dst:callsite

@@ -86,18 +86,22 @@ public enum Operation {
     PUT_ATTR,
 
     RETURN_UNIT,
-    RETURN_VALUE,
+    RETURN_INT,
+    RETURN_FLOAT,
 
     GOTO,
 
     JUMP_IF_TRUE,
     JUMP_IF_FALSE,
 
-    POP_PARAM,
+    POP_PARAM_INT,
+    POP_PARAM_FLOAT,
 
-    PUSH_PARAM,
+    PUSH_PARAM_INT,
+    PUSH_PARAM_FLOAT,
 
-    CALL,
+    CALL_INT,
+    CALL_FLOAT,
     CALL_UNIT,
     TAILCALL;
 
@@ -114,11 +118,13 @@ public enum Operation {
 
     public boolean readsFromDst() {
         switch (this) {
-            case PUSH_PARAM:
+            case PUSH_PARAM_INT:
+            case PUSH_PARAM_FLOAT:
             case PUT_ATTR:
             case DEREF_PUT_ATTR:
             case CALL_UNIT:
-            case RETURN_VALUE:
+            case RETURN_INT:
+            case RETURN_FLOAT:
             case TAILCALL:
                 return true;
             default:
@@ -131,7 +137,8 @@ public enum Operation {
             case GOTO:
             case TAILCALL:
             case RETURN_UNIT:
-            case RETURN_VALUE:
+            case RETURN_INT:
+            case RETURN_FLOAT:
             case JUMP_IF_TRUE:
             case JUMP_IF_FALSE:
                 return true;
@@ -158,15 +165,31 @@ public enum Operation {
             case REFER_ATTR:
             case POINTER_PUT:
             case DEREF_PUT_ATTR:
-            case PUSH_PARAM:
-            case POP_PARAM:
+            case PUSH_PARAM_INT:
+            case PUSH_PARAM_FLOAT:
+            case POP_PARAM_INT:
+            case POP_PARAM_FLOAT:
             case PUT_ATTR:
-            case CALL:
+            case CALL_INT:
+            case CALL_FLOAT:
             case CALL_UNIT:
             case TAILCALL:
                 return true;
             default:
                 return false;
+        }
+    }
+
+    public Operation getMatchingReturn() {
+        switch (this) {
+            case CALL_INT:
+                return RETURN_INT;
+            case CALL_FLOAT:
+                return RETURN_FLOAT;
+            case CALL_UNIT:
+                return RETURN_UNIT;
+            default:
+                return null;
         }
     }
 }

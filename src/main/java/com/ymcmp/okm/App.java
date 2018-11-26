@@ -18,6 +18,10 @@ import com.ymcmp.okm.tac.Statement;
 
 import com.ymcmp.okm.runtime.Machine;
 
+import com.ymcmp.okm.converter.Converter;
+import com.ymcmp.okm.converter.IRFormatter;
+import com.ymcmp.okm.converter.AMD64Converter;
+
 public class App {
 
     public static class Args {
@@ -34,8 +38,11 @@ public class App {
         @Parameter(names={"--show-ir"}, description="Shows intermediate representation after compilation", arity=1)
         private boolean showIR = true;
 
-        @Parameter(names={"--exec-ir"}, description="Executes intermediate representation after compilation", arity=1)
-        private boolean execIR = true;
+        @Parameter(names={"--exec-ir"}, description="Executes intermediate representation after compilation")
+        private boolean execIR = false;
+
+        @Parameter(names={"--to-amd64"}, description="Converts IR to x86-64 Intel syntax assembly (use with NASM)")
+        private boolean toAMD64 = false;
 
         @Parameter(names={"--help", "-h"}, description="Displays help")
         private boolean help = false;
@@ -77,14 +84,15 @@ public class App {
                 .compile(argData.inputPaths);
 
         if (argData.showIR) {
-            result.forEach((k, v) -> {
-                System.out.println("Function " + k);
-                for (int i = 0; i < v.size(); ++i) {
-                    System.out.printf("%4d %s", i, v.get(i));
-                    System.out.println("");
-                }
-                System.out.println("");
-            });
+            final IRFormatter conv = new IRFormatter();
+            result.forEach(conv::convert);
+            System.out.println(conv.getResult());
+        }
+
+        if (argData.toAMD64) {
+            final AMD64Converter conv = new AMD64Converter();
+            result.forEach(conv::convert);
+            System.out.println(conv.getResult());
         }
 
         if (argData.execIR) {
