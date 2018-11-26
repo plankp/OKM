@@ -40,6 +40,8 @@ public class AMD64Converter implements Converter {
     private final Map<Fixnum, DataValue> sectData = new HashMap<>();
     private final List<String> sectText = new ArrayList<>();
 
+    private final List<String> funcPrologue = new ArrayList<>();
+    private final List<String> funcEpilogue = new ArrayList<>();
     private final HashMap<Value, String> dataMapping = new HashMap<>();
     private int stackOffset;
 
@@ -64,16 +66,26 @@ public class AMD64Converter implements Converter {
 
     @Override
     public void convert(final String name, final List<Statement> body) {
-        final ArrayList<String> code = new ArrayList<>();
-        code.add(mangleName(name) + ":");
-        code.add("    push rbp        ; save old call frame");
-        code.add("    mov rbp, rsp    ; initialize new call frame");
-
+        // Reset necessary fields
+        funcPrologue.clear();
+        funcEpilogue.clear();
         dataMapping.clear();
         stackOffset = 0;
 
-        int intParam = 0;
-        int floatParam = 0;
+        funcPrologue.add(mangleName(name) + ":");
+        funcPrologue.add("    ;;@ prologue");
+        funcPrologue.add("    push rbp");
+        funcPrologue.add("    mov rbp, rsp");
+
+        final ArrayList<String> code = new ArrayList<>();
+
+        int popIntParam = 0;
+        int popFloatParam = 0;
+
+        int pushIntParam = 0;
+        int pushFloatParam = 0;
+
+        boolean moveRSP = false;
 
         for (int i = 0; i < body.size(); ++i) {
             final Statement stmt = body.get(i);
@@ -244,31 +256,31 @@ public class AMD64Converter implements Converter {
                 case POP_PARAM_FLOAT: {
                     final int bs = stmt.getDataSize() / 8;
                     String dst;
-                    if (floatParam < 8) {
+                    if (popFloatParam < 8) {
                         dst = String.format("[rbp - %d]", (stackOffset = roundToNextDivisible(stackOffset, bs)));
-                        code.add("    " + (bs == 4 ? "movss" : "movsd") + " " + dst + ", " + getFloatRegParam(floatParam));
+                        code.add("    " + (bs == 4 ? "movss" : "movsd") + " " + dst + ", " + getFloatRegParam(popFloatParam));
                     } else {
                         // Leave the data on the stack for now
-                        dst = String.format("[rbp + %d]", 16 + 8 * (floatParam - 8));
+                        dst = String.format("[rbp + %d]", 16 + 8 * (popFloatParam - 8));
                     }
 
                     dataMapping.put(stmt.dst, dst);
-                    ++floatParam;
+                    ++popFloatParam;
                     break;
                 }
                 case POP_PARAM_INT: {
                     final int bs = stmt.getDataSize() / 8;
                     String dst;
-                    if (intParam < 6) {
+                    if (popIntParam < 6) {
                         dst = String.format("[rbp - %d]", (stackOffset = roundToNextDivisible(stackOffset, bs)));
-                        code.add("    mov " + dst + ", " + getIntRegParam(intParam, bs));
+                        code.add("    mov " + dst + ", " + getIntRegParam(popIntParam, bs));
                     } else {
                         // Leave the data on the stack for now
-                        dst = String.format("[rbp + %d]", 16 + 8 * (intParam - 6));
+                        dst = String.format("[rbp + %d]", 16 + 8 * (popIntParam - 6));
                     }
 
                     dataMapping.put(stmt.dst, dst);
-                    ++intParam;
+                    ++popIntParam;
                     break;
                 }
                 case INT_LT:
@@ -351,7 +363,7 @@ public class AMD64Converter implements Converter {
                     final String tmp = getIntRegister(bs);
                     code.add("    mov rax, " + getNumber(stmt.lhs));
                     code.add("    mov " + tmp + ", [rax]");
-                    
+
                     if (dataMapping.containsKey(stmt.dst)) {
                         code.add("    mov " + dataMapping.get(stmt.dst) + ", " + tmp);
                     } else {
@@ -381,52 +393,113 @@ public class AMD64Converter implements Converter {
                 case RETURN_FLOAT:
                     code.add("    " + (stmt.getDataSize() / 8 == 4 ? "movss" : "movsd") + " xmm0, " + getNumber(stmt.dst));
                     generateFuncEpilogue(code);
+                    code.add("    ret");
                     break;
-                case RETURN_INT: {
+                case RETURN_INT:
+                    moveSignExtend(stmt.getDataSize() / 8, code, getNumber(stmt.dst));
+                    generateFuncEpilogue(funcEpilogue);
+                    funcEpilogue.add("    ret");
+                    break;
+                case RETURN_UNIT:
+                    generateFuncEpilogue(funcEpilogue);
+                    funcEpilogue.add("    ret");
+                    break;
+                case CALL_INT: {
+                    moveRSP = true;
+                    pushIntParam = pushFloatParam = 0;
+                    code.add("    call " + mangleName(stmt.lhs.toString()));
+
+                    // Expect return value to be in ?ax
                     final int bs = stmt.getDataSize() / 8;
-                    final String src = getNumber(stmt.dst);
-                    switch (bs) {
-                        case 1:
-                            code.add("    movsx eax, " + toWordSizeString(bs) + " " + src);
-                            break;
-                        case 2:
-                            code.add("    mov ax, " + src);
-                            code.add("    cwde");
-                            break;
-                        case 4:
-                            code.add("    mov eax, " + src);
-                            break;
-                        case 8:
-                            code.add("    mov rax, " + src);
-                            break;
-                        default:
-                            throw new AssertionError("Unknown data size " + bs);
+                    final String reg = getIntRegister(bs);
+                    if (dataMapping.containsKey(stmt.dst)) {
+                        code.add("    mov " + dataMapping.get(stmt.dst) + ", " + reg);
+                    } else {
+                        final String loc = String.format("[rbp - %d]", (stackOffset += bs));
+                        dataMapping.put(stmt.dst, loc);
+                        code.add("    mov " + loc + ", " + reg);
                     }
-                    generateFuncEpilogue(code);
                     break;
                 }
-                case RETURN_UNIT:
-                    generateFuncEpilogue(code);
+                case CALL_FLOAT: {
+                    moveRSP = true;
+                    pushIntParam = pushFloatParam = 0;
+                    code.add("    call " + mangleName(stmt.lhs.toString()));
+
+                    // Expect return value to be in xmm0
+                    final int bs = stmt.getDataSize() / 8;
+                    final String mov = bs == 8 ? "movsd" : "movss";
+                    if (dataMapping.containsKey(stmt.dst)) {
+                        code.add("    " + mov + " " + dataMapping.get(stmt.dst) + ", xmm0");
+                    } else {
+                        final String loc = String.format("[rbp - %d]", (stackOffset += bs));
+                        dataMapping.put(stmt.dst, loc);
+                        code.add("    " + mov + " " + loc + ", xmm0");
+                    }
                     break;
+                }
+                case CALL_UNIT:
+                    moveRSP = true;
+                    pushIntParam = pushFloatParam = 0;
+                    code.add("    call " + mangleName(stmt.dst.toString()));
+                    break;
+                case TAILCALL:
+                    pushIntParam = pushFloatParam = 0;
+                    generateFuncEpilogue(funcEpilogue);
+                    funcEpilogue.add("    ;;@ tailcall");
+                    funcEpilogue.add("    jmp " + mangleName(stmt.dst.toString()));
+                    break;
+                case PUSH_PARAM_INT: {
+                    final int bs = stmt.getDataSize() / 8;
+                    if (pushIntParam < 6) {
+                        // Pass via register
+                        final int prefSize = Math.max(4, bs);
+                        moveSignExtend(bs, code, getNumber(stmt.dst));
+                        code.add("    mov " + getIntRegParam(pushIntParam, prefSize) + ", " + getIntRegister(prefSize));
+                    } else {
+                        // Pass via stack
+                        code.add("    mov [rsp + " + 8 * (pushIntParam - 6) + "], " + getNumber(stmt.dst));
+                    }
+
+                    ++pushIntParam;
+                    break;
+                }
+                case PUSH_PARAM_FLOAT: {
+                    final int bs = stmt.getDataSize() / 8;
+                    if (pushFloatParam < 8) {
+                        // Pass via register
+                        code.add("    " + (bs == 4 ? "movss" : "movsd") + " " + getFloatRegParam(pushFloatParam) + ", " + getNumber(stmt.dst));
+                    } else {
+                        // Pass via stack
+                        code.add("    mov [rsp + " + 8 * (pushFloatParam - 8) + "], " + getNumber(stmt.dst));
+                    }
+
+                    ++pushFloatParam;
+                    break;
+                }
                 default:
                     code.add(stmt.toString());
                     break;
             }
         }
 
-        // If stack is more than 128 bytes (red-zone), need relocate rsp
-        if (stackOffset > 128) {
+        if (moveRSP) {
+            final int relocate = roundToNextDivisible(stackOffset, 16);
+            funcPrologue.add("    sub rsp, " + relocate);
+            funcEpilogue.add(0, "    add rsp, " + relocate);
+        } else if (stackOffset > 128) {
+            // Stack is more than red-zone, need relocate rsp
             final int relocate = stackOffset - 128;
-            code.add(2, "    sub rsp, " + relocate);
-            code.add(code.size() - 2, "    add rsp, " + relocate);
+            funcPrologue.add("    sub rsp, " + relocate);
+            funcEpilogue.add(0, "    add rsp, " + relocate);
         }
-        sectText.add(code.stream().collect(Collectors.joining("\n")));
+        sectText.add(Stream.concat(Stream.concat(funcPrologue.stream(), code.stream()), funcEpilogue.stream())
+                .collect(Collectors.joining("\n")));
     }
 
     private static void generateFuncEpilogue(final List<String> code) {
-        code.add("    ;; restore old call frame");
+        code.add("    ;;@ epilogue");
         code.add("    pop rbp");
-        code.add("    ret");
     }
 
     private static String toWordSizeString(int size) {
@@ -775,6 +848,26 @@ public class AMD64Converter implements Converter {
             final String loc = String.format("[rbp - %d]", (stackOffset += bs));
             dataMapping.put(stmt.dst, loc);
             code.add("    " + mov + " " + loc + ", xmm0");
+        }
+    }
+
+    private void moveSignExtend(int bs, List<String> code, String value) {
+        switch (bs) {
+            case 1:
+                code.add("    movsx eax, " + toWordSizeString(bs) + " " + value);
+                break;
+            case 2:
+                code.add("    mov ax, " + value);
+                code.add("    cwde");
+                break;
+            case 4:
+                code.add("    mov eax, " + value);
+                break;
+            case 8:
+                code.add("    mov rax, " + value);
+                break;
+            default:
+                throw new AssertionError("Unknown data size " + bs);
         }
     }
 }
