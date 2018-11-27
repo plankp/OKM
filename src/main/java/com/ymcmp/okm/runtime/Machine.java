@@ -58,6 +58,8 @@ public class Machine {
         // std.io
             case "print_int":      System.out.print(toInt(callStack.pop())); return true;
             case "println_int":    System.out.println(toInt(callStack.pop())); return true;
+            case "print_long":     System.out.print(toLong(callStack.pop())); return true;
+            case "println_long":   System.out.println(toLong(callStack.pop())); return true;
             case "print_double":   System.out.print(toDouble(callStack.pop())); return true;
             case "println_double": System.out.println(toDouble(callStack.pop())); return true;
             case "print_bool":     System.out.print(toBool(callStack.pop())); return true;

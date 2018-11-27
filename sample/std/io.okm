@@ -1,6 +1,10 @@
-public unit print (i :long) = native print_long
+public unit print (i :int) = native print_int
 
-public unit println (i :long) = native println_long
+public unit println (i :int) = native println_int
+
+public unit print (l :long) = native print_long
+
+public unit println (l :long) = native println_long
 
 public unit print (d :double) = native print_double
 

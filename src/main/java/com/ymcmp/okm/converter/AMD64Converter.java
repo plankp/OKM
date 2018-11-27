@@ -99,8 +99,11 @@ public class AMD64Converter implements Converter {
                     // Does nothing!
                     break;
                 case CONV_BYTE_INT:
+                    code.add("    movsx edi, " + toWordSizeString(1) + getNumber(stmt.lhs));
+                    code.add("    mov " + getOrAllocSite(4, stmt.dst) + ", edi");
+                    break;
                 case CONV_SHORT_INT:
-                    code.add("    movsx edi, " + getNumber(stmt.lhs));
+                    code.add("    movsx edi, " + toWordSizeString(2) + getNumber(stmt.lhs));
                     code.add("    mov " + getOrAllocSite(4, stmt.dst) + ", edi");
                     break;
                 case CONV_INT_LONG:
@@ -752,7 +755,7 @@ public class AMD64Converter implements Converter {
                 code.add("    imul " + accum + ", " + accum + ", " + scale);
             }
         } else {
-            code.add("    imul " + dataMapping.get(stmt.rhs));
+            code.add("    imul " + toWordSizeString(bs) + dataMapping.get(stmt.rhs));
         }
 
         code.add("    mov " + getOrAllocSite(bs, stmt.dst) + ", " + accum);

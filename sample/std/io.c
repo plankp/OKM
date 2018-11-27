@@ -1,5 +1,13 @@
 #include <stdio.h>
 
+void print_int(int value) {
+    printf("%d", value);
+}
+
+void println_int(int value) {
+    printf("%d\n", value);
+}
+
 void print_long(long value) {
     printf("%ld", value);
 }
