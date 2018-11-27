@@ -1031,14 +1031,18 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
         if (dummyValue instanceof Register && !dummyValue.isTemporary()) {
             validMove = true;
             funcStmts.add(new Statement(Operation.REFER_VAR, dummyValue, temporary));
-        } else if (lastInstr != null && lastInstr.op == Operation.GET_ATTR) {
-            // R1 <- GET_ATTR R0, attr  ; new PUT_ATTR is the same (R1 is used as new value)
-            validMove = true;
-            funcStmts.add(new Statement(Operation.REFER_ATTR, lastInstr.lhs, lastInstr.rhs, temporary));
+        } else if (lastInstr != null) {
+            switch (lastInstr.op) {
+                case GET_ATTR:
+                case DEREF_GET_ATTR:
+                    validMove = true;
+                    funcStmts.add(new Statement(Operation.REFER_ATTR, lastInstr.lhs, lastInstr.rhs, temporary));
+                    break;
+            }
         }
 
         if (!validMove) {
-            throw new UndefinedOperationException("Bad storage pointer of " + value.getText());
+            throw new UndefinedOperationException("Bad storage pointer of " + value.getText() + ", prev " + lastInstr);
         }
         VALUE_STACK.push(temporary);
         final Pointer ptr = new Pointer(valueType);
@@ -1301,6 +1305,7 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
     public Type visitExprAccess(ExprAccessContext ctx) {
         final String attr = ctx.attr.getText();
         final Type base = (Type) visit(ctx.base);
+        Type coreType = base;
 
         boolean isPointer = false;
         Type result = base.tryAccessAttribute(attr);
@@ -1316,6 +1321,7 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
                     while (newBase instanceof Pointer) {
                         newBase = ((Pointer) newBase).inner;
                         if ((result = newBase.tryAccessAttribute(attr)) != null) {
+                            coreType = newBase;
                             break block;
                         }
 
@@ -1352,7 +1358,7 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
             stmt = new Statement(
                     isPointer ? Operation.DEREF_GET_ATTR : Operation.GET_ATTR,
                     VALUE_STACK.pop(),
-                    Register.makeNamed(attr),
+                    new Fixnum(((StructType) coreType).getOffsetOfField(attr)),
                     temporary);
         }
         stmt.setDataSize(result.getSize());

@@ -35,7 +35,10 @@ public class AMD64Converter implements Converter {
             "section .data\n" +
             "align 16\n" +
             "CC0 dd 2147483648,0,0,0\n" +
-            "CC1 dd 0,-2147483648,0,0\n";
+            "CC1 dd 0,-2147483648,0,0";
+
+    private static final String SECTION_TEXT_HEADER =
+            "section .text";
 
     private final Map<Fixnum, DataValue> sectData = new HashMap<>();
     private final List<String> sectText = new ArrayList<>();
@@ -55,7 +58,7 @@ public class AMD64Converter implements Converter {
     public String getResult() {
         return Stream.concat(
                 Stream.concat(Stream.of(SECTION_DATA_HEADER), sectData.values().stream().map(DataValue::output)),
-                Stream.concat(Stream.of("section .text"), sectText.stream()))
+                Stream.concat(Stream.of(SECTION_TEXT_HEADER), sectText.stream()))
                 .collect(Collectors.joining("\n\n"));
     }
 
@@ -263,9 +266,9 @@ public class AMD64Converter implements Converter {
                     intUnary(false, "not", code, stmt);
                     break;
                 case POP_PARAM_FLOAT: {
-                    final int bs = stmt.getDataSize() / 8;
                     String dst;
                     if (popFloatParam < 8) {
+                        final int bs = stmt.getDataSize() / 8;
                         dst = String.format("[rbp - %d]", (stackOffset = roundToNextDivisible(stackOffset, bs)));
                         code.add("    " + (bs == 4 ? "movss" : "movsd") + " " + dst + ", " + getFloatRegParam(popFloatParam));
                     } else {
@@ -281,14 +284,49 @@ public class AMD64Converter implements Converter {
                     final int bs = stmt.getDataSize() / 8;
                     String dst;
                     if (popIntParam < 6) {
-                        dst = String.format("[rbp - %d]", (stackOffset = roundToNextDivisible(stackOffset, bs)));
-                        code.add("    mov " + dst + ", " + getIntRegParam(popIntParam, bs));
+                        if (bs > 8) {
+                            // Data is huge, caller left the pointer to it
+                            dst = null;
+                            final String addr = String.format("[rbp - %d]", (stackOffset += 8));
+                            code.add("    mov " + addr + ", " + getIntRegParam(popIntParam, 8));
+
+                            // right now, addr contains the pointer to the data
+                            // alloca will assign stmt.dst to a location
+                            alloca(bs, stmt.dst, code);
+                            // Copy the data
+                            code.add("    mov rax, " + addr);
+                            for (int iter = 0; iter < bs; iter += 8) {
+                                code.add("    mov rsi, [rax + " + iter + "]");
+                                code.add("    mov [rbp - " + stackOffset + " + " + iter + "], rsi");
+                            }
+                        } else {
+                            dst = String.format("[rbp - %d]", (stackOffset = roundToNextDivisible(stackOffset, bs)));
+                            code.add("    mov " + dst + ", " + getIntRegParam(popIntParam, bs));
+                        }
                     } else {
-                        // Leave the data on the stack for now
-                        dst = String.format("[rbp + %d]", 16 + 8 * (popIntParam - 6));
+                        final String dataSrc = String.format("[rbp + %d]", 16 + 8 * (popIntParam - 6));
+                        if (bs > 8) {
+                            // Have to copy the data from pointer
+                            dst = null;
+                            code.add("    mov rax, " + dataSrc);
+
+                            // right now, rax contains the pointer to the data
+                            // alloca will assign stmt.dst to a location
+                            alloca(bs, stmt.dst, code);
+                            // Copy the data
+                            for (int iter = 0; iter < bs; iter += 8) {
+                                code.add("    mov rsi, [rax + " + iter + "]");
+                                code.add("    mov [rbp - " + stackOffset + " + " + iter + "], rsi");
+                            }
+                        } else {
+                            // Leave the data on the stack for now
+                            dst = dataSrc;
+                        }
                     }
 
-                    dataMapping.put(stmt.dst, dst);
+                    if (dst != null) {
+                        dataMapping.put(stmt.dst, dst);
+                    }
                     ++popIntParam;
                     break;
                 }
@@ -367,6 +405,22 @@ public class AMD64Converter implements Converter {
                         code.add("    mov " + loc + ", rax");
                     }
                     break;
+                case REFER_ATTR: {
+                    final int bs = stmt.getDataSize() / 8;
+
+                    code.add("    mov rax, " + getNumber(stmt.lhs));
+                    code.add("    add rax, " + (Long.parseLong(((Fixnum) stmt.rhs).value) / 8));
+
+                    // Pointers are 8 bytes
+                    if (dataMapping.containsKey(stmt.dst)) {
+                        code.add("    mov " + dataMapping.get(stmt.dst) + ", rax");
+                    } else {
+                        final String loc = String.format("[rbp - %d]", (stackOffset += 8));
+                        dataMapping.put(stmt.dst, loc);
+                        code.add("    mov " + loc + ", rax");
+                    }
+                    break;
+                }
                 case POINTER_GET: {
                     final int bs = stmt.getDataSize() / 8;
                     final String tmp = getIntRegister(bs);
@@ -382,10 +436,14 @@ public class AMD64Converter implements Converter {
                     }
                     break;
                 }
-                case POINTER_PUT:
-                    code.add("    mov rax, " + getNumber(stmt.dst));
-                    code.add("    mov " + toWordSizeString(stmt.getDataSize() / 8) + " [rax], " + getNumber(stmt.lhs));
+                case POINTER_PUT: {
+                    final int bs = stmt.getDataSize() / 8;
+                    final String tmp = getIntRegister(bs);
+                    code.add("    mov rdi, " + getNumber(stmt.dst));
+                    code.add("    mov " + tmp + ", " + getNumber(stmt.lhs));
+                    code.add("    mov [rdi], " + tmp);
                     break;
+                }
                 case GOTO:
                     code.add("    jmp .L" + ((Label) stmt.dst).getAddress());
                     break;
@@ -404,11 +462,18 @@ public class AMD64Converter implements Converter {
                     generateFuncEpilogue(code);
                     code.add("    ret");
                     break;
-                case RETURN_INT:
-                    moveSignExtend(stmt.getDataSize() / 8, code, getNumber(stmt.dst));
+                case RETURN_INT: {
+                    final int bs = stmt.getDataSize() / 8;
+                    if (bs > 8) {
+                        // Returning a big struct, move the ptr to rax 
+                        code.add("    lea rax, " + getNumber(stmt.dst));
+                    } else {
+                        moveSignExtend(bs, code, getNumber(stmt.dst));
+                    }
                     generateFuncEpilogue(funcEpilogue);
                     funcEpilogue.add("    ret");
                     break;
+                }
                 case RETURN_UNIT:
                     generateFuncEpilogue(funcEpilogue);
                     funcEpilogue.add("    ret");
@@ -418,15 +483,41 @@ public class AMD64Converter implements Converter {
                     pushIntParam = pushFloatParam = 0;
                     code.add("    call " + mangleName(stmt.lhs.toString()));
 
-                    // Expect return value to be in ?ax
                     final int bs = stmt.getDataSize() / 8;
-                    final String reg = getIntRegister(bs);
-                    if (dataMapping.containsKey(stmt.dst)) {
-                        code.add("    mov " + dataMapping.get(stmt.dst) + ", " + reg);
+                    if (bs > 8) {
+                        alloca(bs, stmt.dst, code);
+
+                        // Copy as 8 bytes first
+                        int iter = 0;
+                        for ( ; iter <= bs - 8; iter += 8) {
+                            code.add("    mov rsi, [rax + " + iter + "]");
+                            code.add("    mov [rbp - " + stackOffset + " + " + iter + "], rsi");
+                        }
+                        // Copy as 4 bytes
+                        for ( ; iter <= bs - 4; iter += 4) {
+                            code.add("    mov esi, [rax + " + iter + "]");
+                            code.add("    mov [rbp - " + stackOffset + " + " + iter + "], esi");
+                        }
+                        // Copy as 2 bytes
+                        for ( ; iter <= bs - 2; iter += 2) {
+                            code.add("    mov si, [rax + " + iter + "]");
+                            code.add("    mov [rbp - " + stackOffset + " + " + iter + "], si");
+                        }
+                        // Copy the remaining bytes (if bs was not multiple of 8)
+                        for ( ; iter < bs; ++iter) {
+                            code.add("    mov sil, [rax + " + iter + "]");
+                            code.add("    mov [rbp - " + stackOffset + " + " + iter + "], sil");
+                        }
                     } else {
-                        final String loc = String.format("[rbp - %d]", (stackOffset += bs));
-                        dataMapping.put(stmt.dst, loc);
-                        code.add("    mov " + loc + ", " + reg);
+                        // Expect return value to be in [al, rax]
+                        final String reg = getIntRegister(bs);
+                        if (dataMapping.containsKey(stmt.dst)) {
+                            code.add("    mov " + dataMapping.get(stmt.dst) + ", " + reg);
+                        } else {
+                            final String loc = String.format("[rbp - %d]", (stackOffset += bs));
+                            dataMapping.put(stmt.dst, loc);
+                            code.add("    mov " + loc + ", " + reg);
+                        }
                     }
                     break;
                 }
@@ -461,13 +552,25 @@ public class AMD64Converter implements Converter {
                 case PUSH_PARAM_INT: {
                     final int bs = stmt.getDataSize() / 8;
                     if (pushIntParam < 6) {
-                        // Pass via register
-                        final int prefSize = Math.max(4, bs);
-                        moveSignExtend(bs, code, getNumber(stmt.dst));
-                        code.add("    mov " + getIntRegParam(pushIntParam, prefSize) + ", " + getIntRegister(prefSize));
+                        if (bs > 8) {
+                            // Data is huge, pass pointer to it (pointer is 8 bytes)
+                            code.add("    lea " + getIntRegParam(pushIntParam, 8) + ", " + getNumber(stmt.dst));
+                        } else {
+                            // Pass via register
+                            final int prefSize = Math.max(4, bs);
+                            moveSignExtend(bs, code, getNumber(stmt.dst));
+                            code.add("    mov " + getIntRegParam(pushIntParam, prefSize) + ", " + getIntRegister(prefSize));
+                        }
                     } else {
-                        // Pass via stack
-                        code.add("    mov [rsp + " + 8 * (pushIntParam - 6) + "], " + getNumber(stmt.dst));
+                        final String site = String.format("[rsp + %d]", 8 * (pushIntParam - 6));
+                        if (bs > 8) {
+                            // Data is huge, pass pointer to it (on the stack)
+                            code.add("    lea rax, " + getNumber(stmt.dst));
+                            code.add("    mov " + site + ", rax");
+                        } else {
+                            // Pass via stack
+                            code.add("    mov " + site + ", " + getNumber(stmt.dst));
+                        }
                     }
 
                     ++pushIntParam;
@@ -486,11 +589,90 @@ public class AMD64Converter implements Converter {
                     ++pushFloatParam;
                     break;
                 }
+                case ALLOC_STRUCT:
+                    // Acquire a pointer to the start of the struct
+                    alloca(stmt.getDataSize() / 8, stmt.dst, code);
+                    break;
+                case PUT_ATTR: {
+                    // dst is the value being dumped into the struct
+                    // lhs is the pointer of the struct
+                    // rhs is the offset we are working with!
+                    final int bs = stmt.getDataSize() / 8;
+                    final String tmp = getIntRegister(bs);
+                    final StringBuilder structHead = new StringBuilder(getNumber(stmt.lhs));
+                    structHead
+                            .insert(structHead.length() - 1, " + ")
+                            .insert(structHead.length() - 1, Long.parseLong(((Fixnum) stmt.rhs).value) / 8);
+
+                    code.add("    mov " + tmp + ", " + getNumber(stmt.dst));
+                    code.add("    mov " + structHead + ", " + tmp);
+                    break;
+                }
+                case DEREF_PUT_ATTR: {
+                    // dst is the value being dumped into the struct
+                    // lhs is the pointer to a struct pointer
+                    // rhs is the offset we are working with!
+                    final int bs = stmt.getDataSize() / 8;
+                    final String tmp = getIntRegister(bs);
+
+                    code.add("    mov " + tmp + ", " + getNumber(stmt.dst));
+                    code.add("    mov rdi, " + getNumber(stmt.lhs));
+                    code.add("    mov [rdi + " + (Long.parseLong(((Fixnum) stmt.rhs).value) / 8) + "], " + tmp);
+                    break;
+                }
+                case GET_ATTR: {
+                    // dst is the output
+                    // lhs is the pointer of the struct
+                    // rhs is the offset we are working with!
+                    final int bs = stmt.getDataSize() / 8;
+                    final String tmp = getIntRegister(bs);
+                    final StringBuilder structHead = new StringBuilder(getNumber(stmt.lhs));
+                    structHead
+                            .insert(structHead.length() - 1, " + ")
+                            .insert(structHead.length() - 1, Long.parseLong(((Fixnum) stmt.rhs).value) / 8);
+
+                    code.add("    mov " + tmp + ", " + structHead);
+
+                    if (dataMapping.containsKey(stmt.dst)) {
+                        code.add("    mov " + dataMapping.get(stmt.dst) + ", " + tmp);
+                    } else {
+                        final String loc = String.format("[rbp - %d]", (stackOffset += bs));
+                        dataMapping.put(stmt.dst, loc);
+                        code.add("    mov " + loc + ", " + tmp);
+                    }
+                    break;
+                }
+                case DEREF_GET_ATTR: {
+                    // dst is the output
+                    // lhs is the pointer to a struct pointer
+                    // rhs is the offset we are working with!
+                    final int bs = stmt.getDataSize() / 8;
+                    final String tmp = getIntRegister(bs);
+
+                    code.add("    mov rax, " + getNumber(stmt.lhs));
+                    code.add("    mov " + tmp + ", [rax + " + (Long.parseLong(((Fixnum) stmt.rhs).value) / 8) + "]");
+
+                    if (dataMapping.containsKey(stmt.dst)) {
+                        code.add("    mov " + dataMapping.get(stmt.dst) + ", " + tmp);
+                    } else {
+                        final String loc = String.format("[rbp - %d]", (stackOffset += bs));
+                        dataMapping.put(stmt.dst, loc);
+                        code.add("    mov " + loc + ", " + tmp);
+                    }
+                    break;
+                }
                 default:
                     code.add(stmt.toString());
                     break;
             }
         }
+
+        /*
+        Missing features:
+          Instrinsics and Standard Library (conditional compilation?)
+          GAS supporting output (.intel_syntax noprefix)
+          Optimizer?
+        */
 
         if (moveRSP) {
             final int relocate = roundToNextDivisible(stackOffset, 16);
@@ -877,6 +1059,20 @@ public class AMD64Converter implements Converter {
                 break;
             default:
                 throw new AssertionError("Unknown data size " + bs);
+        }
+    }
+
+    private void alloca(int bytes, Value dst, List<String> code) {
+        // Acquire a pointer to block of data
+        code.add("    lea rdi, [rbp - " + stackOffset + "]");
+        stackOffset += bytes;
+
+        if (dataMapping.containsKey(dst)) {
+            code.add("    mov " + dataMapping.get(dst) + ", rdi");
+        } else {
+            final String loc = String.format("[rbp - %d]", (stackOffset += 8));
+            dataMapping.put(dst, loc);
+            code.add("    mov " + loc + ", rdi");
         }
     }
 }

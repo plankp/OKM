@@ -1,5 +1,6 @@
 package com.ymcmp.okm.type;
 
+import java.util.Map;
 import java.util.LinkedHashMap;
 
 import com.ymcmp.okm.except.DuplicateSymbolException;
@@ -70,6 +71,17 @@ public final class StructType implements Type {
     @Override
     public Type tryAccessAttribute(String attr) {
         return allocated ? fields.get(attr) : null;
+    }
+
+    public int getOffsetOfField(String attr) {
+        int offset = 0;
+        for (final Map.Entry<String, Type> pair : fields.entrySet()) {
+            if (pair.getKey().equals(attr)) {
+                break;
+            }
+            offset += pair.getValue().getSize();
+        }
+        return offset;
     }
 
     @Override
