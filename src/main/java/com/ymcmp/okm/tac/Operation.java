@@ -101,6 +101,8 @@ public enum Operation {
     PUSH_PARAM_INT,
     PUSH_PARAM_FLOAT,
 
+    CALL_NATIVE,
+
     CALL_INT,
     CALL_FLOAT,
     CALL_UNIT,
@@ -171,6 +173,7 @@ public enum Operation {
             case POP_PARAM_INT:
             case POP_PARAM_FLOAT:
             case PUT_ATTR:
+            case CALL_NATIVE:
             case CALL_INT:
             case CALL_FLOAT:
             case CALL_UNIT:

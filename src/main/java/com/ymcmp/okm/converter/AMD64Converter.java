@@ -383,6 +383,19 @@ public class AMD64Converter implements Converter {
                     generateFuncEpilogue(funcEpilogue);
                     funcEpilogue.add("    ret");
                     break;
+                case CALL_NATIVE:
+                    // Almost like a tail call, except it doesnt need prologue or epilogue
+                    // it just jumps!
+                    pushIntParam = pushFloatParam = 0;
+                    funcPrologue.subList(1, funcPrologue.size()).clear();
+                    funcEpilogue.clear();
+                    code.clear();
+
+                    funcEpilogue.add("    ;;@ native call");
+                    funcEpilogue.add("    jmp _" + stmt.dst);
+
+                    funcPrologue.add(0, "    extern _" + stmt.dst);
+                    break;
                 case CALL_INT: {
                     moveRSP = true;
                     pushIntParam = pushFloatParam = 0;
@@ -522,13 +535,6 @@ public class AMD64Converter implements Converter {
                     break;
             }
         }
-
-        /*
-        Missing features:
-          Instrinsics and Standard Library (conditional compilation?)
-          GAS supporting output (.intel_syntax noprefix)
-          Optimizer?
-        */
 
         if (moveRSP) {
             final int relocate = roundToNextDivisible(stackOffset, 16);
