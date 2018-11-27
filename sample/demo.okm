@@ -1,5 +1,5 @@
 import std.io
-import std.math(PI, :atan2(y, x), :sin(rad))
+import std.math(PI, :atan(y, x), :sin(rad))
 
 import cards
 import rel.vis
@@ -12,8 +12,8 @@ unit demo() {
     a, b :double;
 
     # a must equal b (they call the same function)
-    a = atan2(y: 20, x: 50);
-    b = :atan2(y, x)(20, 50);
+    a = atan(y: 20, x: 50);
+    b = :atan(y, x)(20, 50);
 
     # C equals yields 0
     c := sin(rad: PI);
