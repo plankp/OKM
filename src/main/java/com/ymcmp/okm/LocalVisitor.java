@@ -1449,7 +1449,16 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
         }
 
         if (!(symType instanceof EnumType)) {
-            VALUE_STACK.push(Register.makeNamed(currentScope.getProcessedName(NAMING_STRAT, symbol)));
+            final Register r = Register.makeNamed(currentScope.getProcessedName(NAMING_STRAT, symbol));
+            if (symbol.charAt(symbol.length() - 1) == ':') {
+                // Functions use LOAD_FUNCTION
+                final Register tmp = Register.makeTemporary();
+                final Statement stmt = new Statement(Operation.LOAD_FUNC, r, tmp);
+                funcStmts.add(stmt);
+                VALUE_STACK.push(tmp);
+            } else {
+                VALUE_STACK.push(r);
+            }
         }
 
         return symType;

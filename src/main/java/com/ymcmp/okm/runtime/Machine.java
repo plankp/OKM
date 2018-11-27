@@ -225,8 +225,8 @@ public class Machine {
                         locals.put(stmt.dst, Fixnum.FALSE);
                         break;
                     case LOAD_NUMERAL:  //      dst:result, lhs:value
+                    case LOAD_FUNC:     //      dst:store, lhs:label
                         locals.put(stmt.dst, stmt.lhs);
-                        break;
                     case STORE_VAR:     //      dst:store, lhs:value
                         locals.put(stmt.dst, fetchValue(stmt.lhs).duplicate());
                         break;

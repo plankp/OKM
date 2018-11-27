@@ -29,7 +29,7 @@ public class AMD64Converter implements Converter {
             "    section .text";
 
     private final Map<Fixnum, DataValue> sectData = new HashMap<>();
-    private final List<String> sectBss = new ArrayList<>();
+    private final Map<String, String> sectBss = new HashMap<>();
     private final List<String> sectText = new ArrayList<>();
 
     private final List<String> funcPrologue = new ArrayList<>();
@@ -48,7 +48,7 @@ public class AMD64Converter implements Converter {
     public String getResult() {
         return Stream.concat(Stream.concat(
                 Stream.concat(Stream.of(SECTION_DATA_HEADER), sectData.values().stream().map(DataValue::output)),
-                Stream.concat(Stream.of(SECTION_BSS_HEADER), sectBss.stream())),
+                Stream.concat(Stream.of(SECTION_BSS_HEADER), sectBss.values().stream().map(e -> e.startsWith("??") ? "extern " + e.substring(2) : e))),
                 Stream.concat(Stream.of(SECTION_TEXT_HEADER), sectText.stream()))
                 .collect(Collectors.joining("\n\n"));
     }
@@ -294,7 +294,7 @@ public class AMD64Converter implements Converter {
                     code.add("    setg cl");
                     code.add("    mov eax, -1");
                     code.add("    cmovge eax, ecx");
-                    code.add("    mov " + getOrAllocSite(4, stmt.dst) + ", eax");
+                    code.add("    mov " + getOrAllocSite(1, stmt.dst) + ", al");
                     break;
                 }
                 case FLOAT_CMP:
@@ -317,6 +317,10 @@ public class AMD64Converter implements Converter {
                     code.add("    mov " + getOrAllocSite(bs, stmt.dst) + ", " + tmp);
                     break;
                 }
+                case LOAD_FUNC:
+                    code.add("    lea rax, [rel " + mangleName(stmt.lhs.toString()) + "]");
+                    code.add("    mov " + getOrAllocSite(8, stmt.dst) + ", rax");
+                    break;
                 case REFER_VAR:
                     code.add("    lea rax, " + getNumber(stmt.lhs));
                     code.add("    mov " + getOrAllocSite(8, stmt.dst) + ", rax");
@@ -349,13 +353,13 @@ public class AMD64Converter implements Converter {
                     code.add("    jmp .L" + ((Label) stmt.dst).getAddress());
                     break;
                 case JUMP_IF_TRUE:
-                    // int is 4 bytes
-                    code.add("    cmp " + toWordSizeString(4) + " " + getNumber(stmt.lhs) + ", 0");
+                    // bool is 1 byte
+                    code.add("    cmp " + toWordSizeString(1) + " " + getNumber(stmt.lhs) + ", 0");
                     code.add("    jne .L" + ((Label) stmt.dst).getAddress());
                     break;
                 case JUMP_IF_FALSE:
-                    // int is 4 bytes
-                    code.add("    cmp " + toWordSizeString(4) + " " + getNumber(stmt.lhs) + ", 0");
+                    // bool is 1 byte
+                    code.add("    cmp " + toWordSizeString(1) + " " + getNumber(stmt.lhs) + ", 0");
                     code.add("    je .L" + ((Label) stmt.dst).getAddress());
                     break;
                 case RETURN_FLOAT:
@@ -382,7 +386,7 @@ public class AMD64Converter implements Converter {
                 case CALL_INT: {
                     moveRSP = true;
                     pushIntParam = pushFloatParam = 0;
-                    code.add("    call " + mangleName(stmt.lhs.toString()));
+                    code.add("    call " + getNumber(stmt.lhs));
 
                     final int bs = stmt.getDataSize() / 8;
                     if (bs > 8) {
@@ -397,7 +401,7 @@ public class AMD64Converter implements Converter {
                 case CALL_FLOAT: {
                     moveRSP = true;
                     pushIntParam = pushFloatParam = 0;
-                    code.add("    call " + mangleName(stmt.lhs.toString()));
+                    code.add("    call " + getNumber(stmt.lhs));
 
                     // Expect return value to be in xmm0
                     final int bs = stmt.getDataSize() / 8;
@@ -407,13 +411,13 @@ public class AMD64Converter implements Converter {
                 case CALL_UNIT:
                     moveRSP = true;
                     pushIntParam = pushFloatParam = 0;
-                    code.add("    call " + mangleName(stmt.dst.toString()));
+                    code.add("    call " + getNumber(stmt.dst));
                     break;
                 case TAILCALL:
                     pushIntParam = pushFloatParam = 0;
                     generateFuncEpilogue(funcEpilogue);
                     funcEpilogue.add("    ;;@ tailcall");
-                    funcEpilogue.add("    jmp " + mangleName(stmt.dst.toString()));
+                    funcEpilogue.add("    jmp " + getNumber(stmt.dst));
                     break;
                 case PUSH_PARAM_INT: {
                     final int bs = stmt.getDataSize() / 8;
@@ -596,6 +600,21 @@ public class AMD64Converter implements Converter {
             // Explicit relative addressing!
             return "[rel " + label + "]";
         }
+
+        final String handle = v.toString();
+        if (handle.startsWith("@M")) {
+            final String mangled = mangleName(handle);
+            if (handle.charAt(handle.length() - 1) == ':') {
+                // function
+                return mangled;
+            }
+            // global variable
+            if (!sectBss.containsKey(handle)) {
+                sectBss.put(handle, "??" + mangled);
+            }
+            return String.format("[rel %s]", mangled);
+        }
+        // local variable
         return dataMapping.get(v);
     }
 
@@ -757,7 +776,7 @@ public class AMD64Converter implements Converter {
         code.add("    mov eax, " + getNumber(stmt.lhs));
         code.add("    cmp eax, " + getNumber(stmt.rhs));
         code.add("    " + cmpInstr + " cl");
-        code.add("    mov " + getOrAllocSite(4, stmt.dst) + ", ecx");
+        code.add("    mov " + getOrAllocSite(1, stmt.dst) + ", cl");
     }
 
     private void loadBoolean(boolean value, List<String> code, Statement stmt) {
@@ -804,7 +823,7 @@ public class AMD64Converter implements Converter {
         code.add("    " + cmp + " xmm1, xmm0");
         code.add("    mov eax, -1");
         code.add("    cmovbe eax, ecx");
-        code.add("    mov " + getOrAllocSite(4, stmt.dst) + ", eax");
+        code.add("    mov " + getOrAllocSite(1, stmt.dst) + ", al");
     }
 
     private void floatNegate(boolean quad, List<String> code, Statement stmt) {
@@ -854,8 +873,10 @@ public class AMD64Converter implements Converter {
         if (handle.startsWith("@M")) {
             // global variable
             final String mangled = mangleName(handle);
-            sectBss.add(mangled + ": " + toBssSizeString(bs) + " 1");
             loc = String.format("[rel %s]", mangled);
+            if (!sectBss.containsKey(handle) || sectBss.get(handle).startsWith("??")) {
+                sectBss.put(handle, mangled + ": " + toBssSizeString(bs) + " 1");
+            }
         } else {
             // local variable
             loc = String.format("[rbp - %d]", (stackOffset += bs));
