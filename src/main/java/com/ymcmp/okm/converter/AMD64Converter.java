@@ -536,13 +536,6 @@ public class AMD64Converter implements Converter {
             }
         }
 
-        /*
-        Missing features:
-          Instrinsics and Standard Library (conditional compilation?)
-          GAS supporting output (.intel_syntax noprefix)
-          Optimizer?
-        */
-
         if (moveRSP) {
             final int relocate = roundToNextDivisible(stackOffset, 16);
             funcPrologue.add("    sub rsp, " + relocate);
