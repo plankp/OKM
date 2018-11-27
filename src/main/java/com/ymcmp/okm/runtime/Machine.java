@@ -43,10 +43,6 @@ public class Machine {
     }
 
     private Value execute(final Map<String, List<Statement>> code, final String funcName) {
-        final Mutable mut = new MutableCell();
-        if (tryCallSpecialFunctions(funcName, mut)) {
-            return mut.getValue();
-        }
         try {
             return execute(code, code.get(funcName));
         } catch (RuntimeException ex) {
@@ -55,33 +51,13 @@ public class Machine {
     }
 
     private boolean tryCallSpecialFunctions(final String funcName, final Mutable mut) {
-        try {
-            if (funcName.startsWith("@M")) {
-                switch (funcName.substring(4)) {
-                // std.io
-                    case "print:i:":    System.out.print(toInt(callStack.pop())); return true;
-                    case "println:i:":  System.out.println(toInt(callStack.pop())); return true;
-                    case "print:b:":    System.out.print(toBool(callStack.pop())); return true;
-                    case "println:b:":  System.out.println(toBool(callStack.pop())); return true;
-                // std.math
-                    case "atan2:y:x:":      mut.setValue(new Fixnum(Math.atan2(toDouble(callStack.pop()), toDouble(callStack.pop())))); return true;
-                    case "asin:x:":         mut.setValue(new Fixnum(Math.asin(toDouble(callStack.pop())))); return true;
-                    case "acos:x:":         mut.setValue(new Fixnum(Math.acos(toDouble(callStack.pop())))); return true;
-                    case "atan:x:":         mut.setValue(new Fixnum(Math.atan(toDouble(callStack.pop())))); return true;
-                    case "sin:rad:":        mut.setValue(new Fixnum(Math.sin(toDouble(callStack.pop())))); return true;
-                    case "cos:rad:":        mut.setValue(new Fixnum(Math.cos(toDouble(callStack.pop())))); return true;
-                    case "tan:rad:":        mut.setValue(new Fixnum(Math.tan(toDouble(callStack.pop())))); return true;
-                    case "sinh:x:":         mut.setValue(new Fixnum(Math.sinh(toDouble(callStack.pop())))); return true;
-                    case "cosh:x:":         mut.setValue(new Fixnum(Math.cosh(toDouble(callStack.pop())))); return true;
-                    case "tanh:x:":         mut.setValue(new Fixnum(Math.tanh(toDouble(callStack.pop())))); return true;
-                    case "power:base:exp:": mut.setValue(new Fixnum(Math.pow(toDouble(callStack.pop()), toDouble(callStack.pop())))); return true;
-                    case "random:":         mut.setValue(new Fixnum(Math.random())); return true;
-                }
-            }
-            return false;
-        } catch (RuntimeException ex) {
-            throw new RuntimeException("RTE in native function " + funcName, ex);
+        switch (funcName) {
+            case "print_int":    System.out.print(toInt(callStack.pop())); return true;
+            case "println_int":  System.out.println(toInt(callStack.pop())); return true;
+            case "print_bool":   System.out.print(toBool(callStack.pop())); return true;
+            case "println_bool": System.out.println(toBool(callStack.pop())); return true;
         }
+        return false;
     }
 
     private Value execute(final Map<String, List<Statement>> code, List<Statement> func) {
@@ -303,6 +279,14 @@ public class Machine {
                         // Pass by value, (including structs)
                         callStack.push(fetchValue(stmt.dst).duplicate());
                         break;
+                    case CALL_NATIVE: { //      dst:name
+                        final String id = stmt.dst.toString();
+                        final Mutable mut = new MutableCell();
+                        if (tryCallSpecialFunctions(id, mut)) {
+                            return mut.getValue();
+                        }
+                        throw new RuntimeException("Unknown native function " + id);
+                    }
                     case CALL_INT:      //      dst:store, lhs:callsite
                     case CALL_FLOAT:    //      dst:store, lhs:callsite
                         locals.put(stmt.dst, execute(code, fetchValue(stmt.lhs).toString()));
@@ -311,15 +295,7 @@ public class Machine {
                         execute(code, fetchValue(stmt.dst).toString());
                         break;
                     case TAILCALL: {    //      dst:callsite
-                        // Update parameter $list, reset counter $i and restart
-                        // unless it is one of the special functions
-                        final String funcName = stmt.dst.toString();
-                        final Mutable mut = new MutableCell();
-                        if (tryCallSpecialFunctions(funcName, mut)) {
-                            return mut.getValue();
-                        }
-
-                        func = code.get(funcName);
+                        func = code.get(stmt.dst.toString());
                         i = -1; // invariant ++i will set it to zero
                         continue;
                     }

@@ -1,15 +1,7 @@
-public unit print (i :int) {
-    # Runtime fill in
-}
+public unit print (i :int) = native print_int
 
-public unit println (i :int) {
-    # Runtime fill in
-}
+public unit println (i :int) = native println_int
 
-public unit print (b :bool) {
-    # Runtime fill in
-}
+public unit print (b :bool) = native print_bool
 
-public unit println (b :bool) {
-    # Runtime fill in
-}
+public unit println (b :bool) = native println_bool
