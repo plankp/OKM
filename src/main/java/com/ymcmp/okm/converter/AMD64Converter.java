@@ -367,6 +367,22 @@ public class AMD64Converter implements Converter {
                         code.add("    mov " + loc + ", rax");
                     }
                     break;
+                case REFER_ATTR: {
+                    final int bs = stmt.getDataSize() / 8;
+
+                    code.add("    mov rax, " + getNumber(stmt.lhs));
+                    code.add("    add rax, " + (Long.parseLong(((Fixnum) stmt.rhs).value) / 8));
+
+                    // Pointers are 8 bytes
+                    if (dataMapping.containsKey(stmt.dst)) {
+                        code.add("    mov " + dataMapping.get(stmt.dst) + ", rax");
+                    } else {
+                        final String loc = String.format("[rbp - %d]", (stackOffset += 8));
+                        dataMapping.put(stmt.dst, loc);
+                        code.add("    mov " + loc + ", rax");
+                    }
+                    break;
+                }
                 case POINTER_GET: {
                     final int bs = stmt.getDataSize() / 8;
                     final String tmp = getIntRegister(bs);
@@ -576,7 +592,6 @@ public class AMD64Converter implements Converter {
 
         /*
         Unimplemented opcodes:
-          REFER_ATTR
           ALLOC_STRUCT
 
         Missing features:
