@@ -3,6 +3,7 @@ package com.ymcmp.okm.runtime;
 import java.util.Map;
 import java.util.List;
 import java.util.Stack;
+import java.util.Random;
 import java.util.HashMap;
 import java.util.Collections;
 
@@ -12,6 +13,8 @@ public class Machine {
 
     public final Stack<Value> callStack = new Stack<>();
     public final Map<Value, Value> locals = new HashMap<>();
+
+    private static final Random RND = new Random();
 
     public Value execute(final Map<String, List<Statement>> code) {
         // Call the initializer if it exists
@@ -52,10 +55,65 @@ public class Machine {
 
     private boolean tryCallSpecialFunctions(final String funcName, final Mutable mut) {
         switch (funcName) {
-            case "print_int":    System.out.print(toInt(callStack.pop())); return true;
-            case "println_int":  System.out.println(toInt(callStack.pop())); return true;
-            case "print_bool":   System.out.print(toBool(callStack.pop())); return true;
-            case "println_bool": System.out.println(toBool(callStack.pop())); return true;
+        // std.io
+            case "print_int":      System.out.print(toInt(callStack.pop())); return true;
+            case "println_int":    System.out.println(toInt(callStack.pop())); return true;
+            case "print_double":   System.out.print(toDouble(callStack.pop())); return true;
+            case "println_double": System.out.println(toDouble(callStack.pop())); return true;
+            case "print_bool":     System.out.print(toBool(callStack.pop())); return true;
+            case "println_bool":   System.out.println(toBool(callStack.pop())); return true;
+        // std.math
+            case "math_power": {
+                final float exp = toFloat(callStack.pop());
+                final float base = toFloat(callStack.pop());
+                mut.setValue(new Fixnum(Math.pow(base, exp), 32));
+                return true;
+            }
+            case "math_random":
+                mut.setValue(new Fixnum(RND.nextInt(), 32));
+                return true;
+            case "math_sin":
+                mut.setValue(new Fixnum(Math.sin(toFloat(callStack.pop())), 32));
+                return true;
+            case "math_cos":
+                mut.setValue(new Fixnum(Math.cos(toFloat(callStack.pop())), 32));
+                return true;
+            case "math_tan":
+                mut.setValue(new Fixnum(Math.tan(toFloat(callStack.pop())), 32));
+                return true;
+            case "math_asin":
+                mut.setValue(new Fixnum(Math.asin(toFloat(callStack.pop())), 32));
+                return true;
+            case "math_acos":
+                mut.setValue(new Fixnum(Math.acos(toFloat(callStack.pop())), 32));
+                return true;
+            case "math_atan":
+                mut.setValue(new Fixnum(Math.atan(toFloat(callStack.pop())), 32));
+                return true;
+            case "math_atan2": {
+                final float x = toFloat(callStack.pop());
+                final float y = toFloat(callStack.pop());
+                mut.setValue(new Fixnum(Math.atan2(y, x), 32));
+                return true;
+            }
+            case "math_sinh":
+                mut.setValue(new Fixnum(Math.sinh(toFloat(callStack.pop())), 32));
+                return true;
+            case "math_cosh":
+                mut.setValue(new Fixnum(Math.cosh(toFloat(callStack.pop())), 32));
+                return true;
+            case "math_tanh":
+                mut.setValue(new Fixnum(Math.tanh(toFloat(callStack.pop())), 32));
+                return true;
+            case "math_asinh":
+                mut.setValue(new Fixnum(asinh(toFloat(callStack.pop())), 32));
+                return true;
+            case "math_acosh":
+                mut.setValue(new Fixnum(acosh(toFloat(callStack.pop())), 32));
+                return true;
+            case "math_atanh":
+                mut.setValue(new Fixnum(atanh(toFloat(callStack.pop())), 32));
+                return true;
         }
         return false;
     }
@@ -344,5 +402,17 @@ public class Machine {
 
     private static double toDouble(final Value v) {
         return Double.parseDouble(((Fixnum) v).value);
+    }
+
+    public static double asinh(double x) {
+        return Math.log(x + Math.sqrt(x * x + 1.0));
+    }
+
+    public static double acosh(double x) {
+        return Math.log(x + Math.sqrt(x * x - 1.0));
+    }
+
+    public static double atanh(double x) {
+        return 0.5 * Math.log((x + 1.0) / (x - 1.0));
     }
 }
