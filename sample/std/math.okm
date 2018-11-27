@@ -1,79 +1,37 @@
-public PI, E :double
+public PI, E :float
 
 unit math() {
-    PI = 3.1415926536
-    E = 2.7182818285
+    PI = 3.1415926536f
+    E = 2.7182818285f
     return
 }
 
-public float power(base :float, exp :int) {
-    # Runtime will fill this in
-    # compiler requires a dummy return
-    return 0
-}
+public float power(base :float, exp :int) = native math_power
 
-public double random() {
-    # Runtime will fill this in
-    # compiler requires a dummy return
-    return 0
-}
+public int random() = native math_random
 
-public double sin (rad :double) {
-    # Runtime will fill this in
-    # compiler requires a dummy return
-    return 0
-}
+public float sin (rad :float) = native math_sin
 
-public double cos (rad :double) {
-    # Runtime will fill this in
-    # compiler requires a dummy return
-    return 0
-}
+public float cos (rad :float) = native math_cos
 
-public double tan (rad :double) {
-    # Runtime will fill this in
-    # compiler requires a dummy return
-    return 0
-}
+public float tan (rad :float) = native math_tan
 
-public double sinh (x :double) {
-    # Runtime will fill this in
-    # compiler requires a dummy return
-    return 0
-}
+public float asin (r :float) = native math_asin
 
-public double cosh (x :double) {
-    # Runtime will fill this in
-    # compiler requires a dummy return
-    return 0
-}
+public float acos (r :float) = native math_acos
 
-public double tanh (x :double) {
-    # Runtime will fill this in
-    # compiler requires a dummy return
-    return 0
-}
+public float atan (r :float) = native math_atan
 
-public double asin (x :double) {
-    # Runtime will fill this in
-    # compiler requires a dummy return
-    return 0
-}
+public float atan (y, x :float) = native math_atan2
 
-public double acos (x :double) {
-    # Runtime will fill this in
-    # compiler requires a dummy return
-    return 0
-}
+public float sinh (x :float) = native math_sinh
 
-public double atan (x :double) {
-    # Runtime will fill this in
-    # compiler requires a dummy return
-    return 0
-}
+public float cosh (x :float) = native math_cosh
 
-public double atan2 (y, x :double) {
-    # Runtime will fill this in
-    # compiler requires a dummy return
-    return 0
-}
+public float tanh (x :float) = native math_tanh
+
+public float asinh (x :float) = native math_asinh
+
+public float acosh (x :float) = native math_acosh
+
+public float atanh (x :float) = native math_atanh
