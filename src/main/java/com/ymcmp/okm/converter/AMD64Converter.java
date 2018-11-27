@@ -231,23 +231,18 @@ public class AMD64Converter implements Converter {
                 }
                 case POP_PARAM_INT: {
                     final int bs = stmt.getDataSize() / 8;
-                    String dst;
+                    String dst = null;
                     if (popIntParam < 6) {
                         if (bs > 8) {
                             // Data is huge, caller left the pointer to it
-                            dst = null;
                             final String addr = String.format("[rbp - %d]", (stackOffset += 8));
                             code.add("    mov " + addr + ", " + getIntRegParam(popIntParam, 8));
 
                             // right now, addr contains the pointer to the data
                             // alloca will assign stmt.dst to a location
                             alloca(bs, stmt.dst, code);
-                            // Copy the data
                             code.add("    mov rax, " + addr);
-                            for (int iter = 0; iter < bs; iter += 8) {
-                                code.add("    mov rsi, [rax + " + iter + "]");
-                                code.add("    mov [rbp - " + stackOffset + " + " + iter + "], rsi");
-                            }
+                            memcpyRaxToStack(bs, code);
                         } else {
                             dst = String.format("[rbp - %d]", (stackOffset = roundToNextDivisible(stackOffset, bs)));
                             code.add("    mov " + dst + ", " + getIntRegParam(popIntParam, bs));
@@ -256,17 +251,12 @@ public class AMD64Converter implements Converter {
                         final String dataSrc = String.format("[rbp + %d]", 16 + 8 * (popIntParam - 6));
                         if (bs > 8) {
                             // Have to copy the data from pointer
-                            dst = null;
                             code.add("    mov rax, " + dataSrc);
 
                             // right now, rax contains the pointer to the data
                             // alloca will assign stmt.dst to a location
                             alloca(bs, stmt.dst, code);
-                            // Copy the data
-                            for (int iter = 0; iter < bs; iter += 8) {
-                                code.add("    mov rsi, [rax + " + iter + "]");
-                                code.add("    mov [rbp - " + stackOffset + " + " + iter + "], rsi");
-                            }
+                            memcpyRaxToStack(bs, code);
                         } else {
                             // Leave the data on the stack for now
                             dst = dataSrc;
@@ -397,28 +387,7 @@ public class AMD64Converter implements Converter {
                     final int bs = stmt.getDataSize() / 8;
                     if (bs > 8) {
                         alloca(bs, stmt.dst, code);
-
-                        // Copy as 8 bytes first
-                        int iter = 0;
-                        for ( ; iter <= bs - 8; iter += 8) {
-                            code.add("    mov rsi, [rax + " + iter + "]");
-                            code.add("    mov [rbp - " + stackOffset + " + " + iter + "], rsi");
-                        }
-                        // Copy as 4 bytes
-                        for ( ; iter <= bs - 4; iter += 4) {
-                            code.add("    mov esi, [rax + " + iter + "]");
-                            code.add("    mov [rbp - " + stackOffset + " + " + iter + "], esi");
-                        }
-                        // Copy as 2 bytes
-                        for ( ; iter <= bs - 2; iter += 2) {
-                            code.add("    mov si, [rax + " + iter + "]");
-                            code.add("    mov [rbp - " + stackOffset + " + " + iter + "], si");
-                        }
-                        // Copy the remaining bytes (if bs was not multiple of 8)
-                        for ( ; iter < bs; ++iter) {
-                            code.add("    mov sil, [rax + " + iter + "]");
-                            code.add("    mov [rbp - " + stackOffset + " + " + iter + "], sil");
-                        }
+                        memcpyRaxToStack(bs, code);
                     } else {
                         // Expect return value to be in [al, rax]
                         code.add("    mov " + getOrAllocSite(bs, stmt.dst) + ", " + getIntRegister(bs));
@@ -893,6 +862,30 @@ public class AMD64Converter implements Converter {
         }
         dataMapping.put(site, loc);
         return loc;
+    }
+
+    private void memcpyRaxToStack(final int bs, List<String> code) {
+        // Copy as 8 bytes first
+        int iter = 0;
+        for ( ; iter <= bs - 8; iter += 8) {
+            code.add("    mov rsi, [rax + " + iter + "]");
+            code.add("    mov [rbp - " + stackOffset + " + " + iter + "], rsi");
+        }
+        // Copy as 4 bytes
+        for ( ; iter <= bs - 4; iter += 4) {
+            code.add("    mov esi, [rax + " + iter + "]");
+            code.add("    mov [rbp - " + stackOffset + " + " + iter + "], esi");
+        }
+        // Copy as 2 bytes
+        for ( ; iter <= bs - 2; iter += 2) {
+            code.add("    mov si, [rax + " + iter + "]");
+            code.add("    mov [rbp - " + stackOffset + " + " + iter + "], si");
+        }
+        // Copy the remaining bytes (if bs was not multiple of 8)
+        for ( ; iter < bs; ++iter) {
+            code.add("    mov sil, [rax + " + iter + "]");
+            code.add("    mov [rbp - " + stackOffset + " + " + iter + "], sil");
+        }
     }
 }
 
