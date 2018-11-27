@@ -515,6 +515,18 @@ public class AMD64Converter implements Converter {
                     code.add("    mov " + structHead + ", " + tmp);
                     break;
                 }
+                case DEREF_PUT_ATTR: {
+                    // dst is the value being dumped into the struct
+                    // lhs is the pointer to a struct pointer
+                    // rhs is the offset we are working with!
+                    final int bs = stmt.getDataSize() / 8;
+                    final String tmp = getIntRegister(bs);
+
+                    code.add("    mov " + tmp + ", " + getNumber(stmt.dst));
+                    code.add("    mov rdi, " + getNumber(stmt.lhs));
+                    code.add("    mov [rdi + " + (Long.parseLong(((Fixnum) stmt.rhs).value) / 8) + "], " + tmp);
+                    break;
+                }
                 case GET_ATTR: {
                     // dst is the output
                     // lhs is the pointer of the struct
@@ -527,7 +539,26 @@ public class AMD64Converter implements Converter {
                             .insert(structHead.length() - 1, Long.parseLong(((Fixnum) stmt.rhs).value) / 8);
 
                     code.add("    mov " + tmp + ", " + structHead);
-                    
+
+                    if (dataMapping.containsKey(stmt.dst)) {
+                        code.add("    mov " + dataMapping.get(stmt.dst) + ", " + tmp);
+                    } else {
+                        final String loc = String.format("[rbp - %d]", (stackOffset += bs));
+                        dataMapping.put(stmt.dst, loc);
+                        code.add("    mov " + loc + ", " + tmp);
+                    }
+                    break;
+                }
+                case DEREF_GET_ATTR: {
+                    // dst is the output
+                    // lhs is the pointer to a struct pointer
+                    // rhs is the offset we are working with!
+                    final int bs = stmt.getDataSize() / 8;
+                    final String tmp = getIntRegister(bs);
+
+                    code.add("    mov rax, " + getNumber(stmt.lhs));
+                    code.add("    mov " + tmp + ", [rax + " + (Long.parseLong(((Fixnum) stmt.rhs).value) / 8) + "]");
+
                     if (dataMapping.containsKey(stmt.dst)) {
                         code.add("    mov " + dataMapping.get(stmt.dst) + ", " + tmp);
                     } else {
@@ -546,8 +577,6 @@ public class AMD64Converter implements Converter {
         /*
         Unimplemented opcodes:
           REFER_ATTR
-          DEREF_GET_ATTR
-          DEREF_PUT_ATTR
           ALLOC_STRUCT
 
         Missing features:
