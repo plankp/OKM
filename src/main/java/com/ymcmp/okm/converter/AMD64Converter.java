@@ -16,21 +16,6 @@ import com.ymcmp.okm.tac.Statement;
 
 public class AMD64Converter implements Converter {
 
-    private static class DataValue {
-
-        public final String label;
-        public final String value;
-
-        public DataValue(String label, String value) {
-            this.label = label;
-            this.value = value;
-        }
-
-        public String output() {
-            return label + ":\n    " + value;
-        }
-    }
-
     private static final String SECTION_DATA_HEADER =
             "section .data\n" +
             "align 16\n" +
@@ -1074,5 +1059,20 @@ public class AMD64Converter implements Converter {
             dataMapping.put(dst, loc);
             code.add("    mov " + loc + ", rdi");
         }
+    }
+}
+
+final class DataValue {
+
+    public final String label;
+    public final String value;
+
+    public DataValue(String label, String value) {
+        this.label = label;
+        this.value = value;
+    }
+
+    public String output() {
+        return label + ":\n    " + value;
     }
 }
