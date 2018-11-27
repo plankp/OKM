@@ -266,9 +266,9 @@ public class AMD64Converter implements Converter {
                     intUnary(false, "not", code, stmt);
                     break;
                 case POP_PARAM_FLOAT: {
-                    final int bs = stmt.getDataSize() / 8;
                     String dst;
                     if (popFloatParam < 8) {
+                        final int bs = stmt.getDataSize() / 8;
                         dst = String.format("[rbp - %d]", (stackOffset = roundToNextDivisible(stackOffset, bs)));
                         code.add("    " + (bs == 4 ? "movss" : "movsd") + " " + dst + ", " + getFloatRegParam(popFloatParam));
                     } else {
@@ -284,14 +284,49 @@ public class AMD64Converter implements Converter {
                     final int bs = stmt.getDataSize() / 8;
                     String dst;
                     if (popIntParam < 6) {
-                        dst = String.format("[rbp - %d]", (stackOffset = roundToNextDivisible(stackOffset, bs)));
-                        code.add("    mov " + dst + ", " + getIntRegParam(popIntParam, bs));
+                        if (bs > 8) {
+                            // Data is huge, caller left the pointer to it
+                            dst = null;
+                            final String addr = String.format("[rbp - %d]", (stackOffset += 8));
+                            code.add("    mov " + addr + ", " + getIntRegParam(popIntParam, 8));
+
+                            // right now, addr contains the pointer to the data
+                            // alloca will assign stmt.dst to a location
+                            alloca(bs, stmt.dst, code);
+                            // Copy the data
+                            code.add("    mov rax, " + addr);
+                            for (int iter = 0; iter < bs; iter += 8) {
+                                code.add("    mov rsi, [rax + " + iter + "]");
+                                code.add("    mov [rbp - " + stackOffset + " + " + iter + "], rsi");
+                            }
+                        } else {
+                            dst = String.format("[rbp - %d]", (stackOffset = roundToNextDivisible(stackOffset, bs)));
+                            code.add("    mov " + dst + ", " + getIntRegParam(popIntParam, bs));
+                        }
                     } else {
-                        // Leave the data on the stack for now
-                        dst = String.format("[rbp + %d]", 16 + 8 * (popIntParam - 6));
+                        final String dataSrc = String.format("[rbp + %d]", 16 + 8 * (popIntParam - 6));
+                        if (bs > 8) {
+                            // Have to copy the data from pointer
+                            dst = null;
+                            code.add("    mov rax, " + dataSrc);
+
+                            // right now, rax contains the pointer to the data
+                            // alloca will assign stmt.dst to a location
+                            alloca(bs, stmt.dst, code);
+                            // Copy the data
+                            for (int iter = 0; iter < bs; iter += 8) {
+                                code.add("    mov rsi, [rax + " + iter + "]");
+                                code.add("    mov [rbp - " + stackOffset + " + " + iter + "], rsi");
+                            }
+                        } else {
+                            // Leave the data on the stack for now
+                            dst = dataSrc;
+                        }
                     }
 
-                    dataMapping.put(stmt.dst, dst);
+                    if (dst != null) {
+                        dataMapping.put(stmt.dst, dst);
+                    }
                     ++popIntParam;
                     break;
                 }
@@ -451,6 +486,7 @@ public class AMD64Converter implements Converter {
                     final int bs = stmt.getDataSize() / 8;
                     if (bs > 8) {
                         alloca(bs, stmt.dst, code);
+
                         // Copy as 8 bytes first
                         int iter = 0;
                         for ( ; iter <= bs - 8; iter += 8) {
@@ -516,13 +552,25 @@ public class AMD64Converter implements Converter {
                 case PUSH_PARAM_INT: {
                     final int bs = stmt.getDataSize() / 8;
                     if (pushIntParam < 6) {
-                        // Pass via register
-                        final int prefSize = Math.max(4, bs);
-                        moveSignExtend(bs, code, getNumber(stmt.dst));
-                        code.add("    mov " + getIntRegParam(pushIntParam, prefSize) + ", " + getIntRegister(prefSize));
+                        if (bs > 8) {
+                            // Data is huge, pass pointer to it (pointer is 8 bytes)
+                            code.add("    lea " + getIntRegParam(pushIntParam, 8) + ", " + getNumber(stmt.dst));
+                        } else {
+                            // Pass via register
+                            final int prefSize = Math.max(4, bs);
+                            moveSignExtend(bs, code, getNumber(stmt.dst));
+                            code.add("    mov " + getIntRegParam(pushIntParam, prefSize) + ", " + getIntRegister(prefSize));
+                        }
                     } else {
-                        // Pass via stack
-                        code.add("    mov [rsp + " + 8 * (pushIntParam - 6) + "], " + getNumber(stmt.dst));
+                        final String site = String.format("[rsp + %d]", 8 * (pushIntParam - 6));
+                        if (bs > 8) {
+                            // Data is huge, pass pointer to it (on the stack)
+                            code.add("    lea rax, " + getNumber(stmt.dst));
+                            code.add("    mov " + site + ", rax");
+                        } else {
+                            // Pass via stack
+                            code.add("    mov " + site + ", " + getNumber(stmt.dst));
+                        }
                     }
 
                     ++pushIntParam;
