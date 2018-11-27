@@ -207,66 +207,72 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
             // Allocate function statement buffer
             funcStmts = new ArrayList<>();
 
-            // Callee retrieves arguments
-            for (final Map.Entry<String, Type> param : currentScope.getCurrentLocals()) {
-                final Register slot = Register.makeNamed(currentScope.getProcessedName(NAMING_STRAT, param.getKey()));
-                final Type t = param.getValue();
-                final Statement stmt = new Statement(t.isFloatPoint() ? Operation.POP_PARAM_FLOAT : Operation.POP_PARAM_INT, slot);
-                stmt.setDataSize(t.getSize());
-                funcStmts.add(stmt);
-            }
-
-            // Process function body here
-            LOGGER.info("Process function body of " + currentScope.functionName);
-            if (fctx.bodyBlock == null) {
-                // The expression is returned as if it was in a
-                // block with a single return statement
-                processReturn((Type) visit(fctx.bodyExpr));
-            } else {
-                // Let the block visitor handle the function body
-                visitBlock(fctx.bodyBlock);
-            }
-
-            // Perform optimization only if program is *correct*
-            final EliminateNopPass eliminateNop = new EliminateNopPass();
-            for (int i = 0; i < 2; ++i) {
-                for (final Pass pass : OPT_PASSES) {
-                    pass.process(mangledName, funcStmts);
-                    pass.reset();
-                    eliminateNop.process(mangledName, funcStmts);
-                    eliminateNop.reset();
+            if (fctx.nativeFFI == null) {
+                // Callee retrieves arguments
+                for (final Map.Entry<String, Type> param : currentScope.getCurrentLocals()) {
+                    final Register slot = Register.makeNamed(currentScope.getProcessedName(NAMING_STRAT, param.getKey()));
+                    final Type t = param.getValue();
+                    final Statement stmt = new Statement(t.isFloatPoint() ? Operation.POP_PARAM_FLOAT : Operation.POP_PARAM_INT, slot);
+                    stmt.setDataSize(t.getSize());
+                    funcStmts.add(stmt);
                 }
-            }
 
-            // Functions *must* end with either a branching instruction
-            // next if block will be true If funcStmts does not end with a branch op
-            if (funcStmts.isEmpty() ? true : !funcStmts.get(funcStmts.size() - 1).op.branches()) {
-                // If the return type is unit, we will add it
-                if (conformingType.isSameType(UnaryType.getType("unit"))) {
-                    funcStmts.add(new Statement(Operation.RETURN_UNIT));
+                // Process function body here
+                LOGGER.info("Process function body of " + currentScope.functionName);
+                if (fctx.bodyBlock == null) {
+                    // The expression is returned as if it was in a
+                    // block with a single return statement
+                    processReturn((Type) visit(fctx.bodyExpr));
                 } else {
-                    throw new RuntimeException("Function " + currentScope.functionName + " does not return!");
+                    // Let the block visitor handle the function body
+                    visitBlock(fctx.bodyBlock);
                 }
-            }
 
-            // In addition, in anything jumps beyond the function's body, it also means function failed to return
-            boolean appendReturn = false;
-            for (final Statement jmpOp : funcStmts) {
-                if (jmpOp.op.branchesToAddress()) {
-                    final Label label = (Label) jmpOp.dst;
-                    if (label.getAddress() >= funcStmts.size()) {
-                        // If the return type is unit, we will add it
-                        if (conformingType.isSameType(UnaryType.getType("unit"))) {
-                            // Just in case for some reason the function ends at 10 and it jumps to 20
-                            label.setAddress(funcStmts.size());
-                            appendReturn = true;
-                        } else {
-                            throw new RuntimeException("Function " + currentScope.functionName + " does not return!");
+                // Perform optimization only if program is *correct*
+                final EliminateNopPass eliminateNop = new EliminateNopPass();
+                for (int i = 0; i < 2; ++i) {
+                    for (final Pass pass : OPT_PASSES) {
+                        pass.process(mangledName, funcStmts);
+                        pass.reset();
+                        eliminateNop.process(mangledName, funcStmts);
+                        eliminateNop.reset();
+                    }
+                }
+
+                // Functions *must* end with either a branching instruction
+                // next if block will be true If funcStmts does not end with a branch op
+                if (funcStmts.isEmpty() ? true : !funcStmts.get(funcStmts.size() - 1).op.branches()) {
+                    // If the return type is unit, we will add it
+                    if (conformingType.isSameType(UnaryType.getType("unit"))) {
+                        funcStmts.add(new Statement(Operation.RETURN_UNIT));
+                    } else {
+                        throw new RuntimeException("Function " + currentScope.functionName + " does not return!");
+                    }
+                }
+
+                // In addition, in anything jumps beyond the function's body, it also means function failed to return
+                boolean appendReturn = false;
+                for (final Statement jmpOp : funcStmts) {
+                    if (jmpOp.op.branchesToAddress()) {
+                        final Label label = (Label) jmpOp.dst;
+                        if (label.getAddress() >= funcStmts.size()) {
+                            // If the return type is unit, we will add it
+                            if (conformingType.isSameType(UnaryType.getType("unit"))) {
+                                // Just in case for some reason the function ends at 10 and it jumps to 20
+                                label.setAddress(funcStmts.size());
+                                appendReturn = true;
+                            } else {
+                                throw new RuntimeException("Function " + currentScope.functionName + " does not return!");
+                            }
                         }
                     }
                 }
+                if (appendReturn) funcStmts.add(new Statement(Operation.RETURN_UNIT));
+            } else {
+                final String nativeName = fctx.nativeFFI.getText();
+                LOGGER.info("Process native function " + currentScope.functionName + " => " + nativeName);
+                funcStmts.add(new Statement(Operation.CALL_NATIVE, Register.makeNamed(nativeName)));
             }
-            if (appendReturn) funcStmts.add(new Statement(Operation.RETURN_UNIT));
 
             // if function has the same name as the module and takes no parameters
             final String synthName = currentScope.functionName.substring(0, currentScope.functionName.length() - 1) + ".okm";

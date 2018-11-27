@@ -5,6 +5,7 @@ S_COMMENT: '#' ~[\r\n]* -> Channel(HIDDEN);
 M_COMMENT: '<#' .*? '#>' -> Channel(HIDDEN);
 
 IMPORT: 'import';
+NATIVE: 'native';
 IF: 'if';
 ELSE: 'else';
 WHILE: 'while';
@@ -123,6 +124,7 @@ functionDecl:
     ret = type base = IDENT LPAREN params = paramList? RPAREN (
         bodyBlock = block
         | SET bodyExpr = expr
+        | SET NATIVE nativeFFI = IDENT
     );
 
 variableDecl: p = parameter;
