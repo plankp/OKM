@@ -222,61 +222,69 @@ public class AMD64Converter implements Converter {
                 case INT_CPL:
                     intUnary(false, "not", code, stmt);
                     break;
-                case POP_PARAM_FLOAT: {
-                    String dst;
-                    if (popFloatParam < 8) {
-                        final int bs = stmt.getDataSize() / 8;
-                        dst = String.format("[rbp - %d]", (stackOffset = roundToNextDivisible(stackOffset, bs)));
-                        code.add("    " + (bs == 4 ? "movss" : "movsd") + " " + dst + ", " + getFloatRegParam(popFloatParam));
-                    } else {
-                        // Leave the data on the stack for now
-                        dst = String.format("[rbp + %d]", 16 + 8 * (popFloatParam - 8));
-                    }
-
-                    dataMapping.put(stmt.dst, dst);
-                    ++popFloatParam;
-                    break;
-                }
-                case POP_PARAM_INT: {
-                    final int bs = stmt.getDataSize() / 8;
-                    String dst = null;
-                    if (popIntParam < 6) {
-                        if (bs > 8) {
-                            // Data is huge, caller left the pointer to it
-                            final String addr = String.format("[rbp - %d]", (stackOffset += 8));
-                            code.add("    mov " + addr + ", " + getIntRegParam(popIntParam, 8));
-
-                            // right now, addr contains the pointer to the data
-                            // alloca will assign stmt.dst to a location
-                            alloca(bs, stmt.dst, code);
-                            code.add("    mov rax, " + addr);
-                            memcpyRaxToStack(bs, code);
-                        } else {
+                case POP_PARAM_FLOAT:
+                    if (stmt.dst != null) {
+                        String dst;
+                        if (popFloatParam < 8) {
+                            final int bs = stmt.getDataSize() / 8;
                             dst = String.format("[rbp - %d]", (stackOffset = roundToNextDivisible(stackOffset, bs)));
-                            code.add("    mov " + dst + ", " + getIntRegParam(popIntParam, bs));
-                        }
-                    } else {
-                        final String dataSrc = String.format("[rbp + %d]", 16 + 8 * (popIntParam - 6));
-                        if (bs > 8) {
-                            // Have to copy the data from pointer
-                            code.add("    mov rax, " + dataSrc);
-
-                            // right now, rax contains the pointer to the data
-                            // alloca will assign stmt.dst to a location
-                            alloca(bs, stmt.dst, code);
-                            memcpyRaxToStack(bs, code);
+                            if (stmt.dst.isTemporary()) {
+                                code.add(MARKER_DST_TEMP);
+                            }
+                            code.add("    " + (bs == 4 ? "movss" : "movsd") + " " + dst + ", " + getFloatRegParam(popFloatParam));
                         } else {
                             // Leave the data on the stack for now
-                            dst = dataSrc;
+                            dst = String.format("[rbp + %d]", 16 + 8 * (popFloatParam - 8));
                         }
-                    }
 
-                    if (dst != null) {
                         dataMapping.put(stmt.dst, dst);
+                    }
+                    ++popFloatParam;
+                    break;
+                case POP_PARAM_INT:
+                    if (stmt.dst != null) {
+                        final int bs = stmt.getDataSize() / 8;
+                        String dst = null;
+                        if (popIntParam < 6) {
+                            if (bs > 8) {
+                                // Data is huge, caller left the pointer to it
+                                final String addr = String.format("[rbp - %d]", (stackOffset += 8));
+                                code.add("    mov " + addr + ", " + getIntRegParam(popIntParam, 8));
+
+                                // right now, addr contains the pointer to the data
+                                // alloca will assign stmt.dst to a location
+                                alloca(bs, stmt.dst, code);
+                                code.add("    mov rax, " + addr);
+                                memcpyRaxToStack(bs, code);
+                            } else {
+                                dst = String.format("[rbp - %d]", (stackOffset = roundToNextDivisible(stackOffset, bs)));
+                                if (stmt.dst.isTemporary()) {
+                                    code.add(MARKER_DST_TEMP);
+                                }
+                                code.add("    mov " + dst + ", " + getIntRegParam(popIntParam, bs));
+                            }
+                        } else {
+                            final String dataSrc = String.format("[rbp + %d]", 16 + 8 * (popIntParam - 6));
+                            if (bs > 8) {
+                                // Have to copy the data from pointer
+                                code.add("    mov rax, " + dataSrc);
+
+                                // right now, rax contains the pointer to the data
+                                // alloca will assign stmt.dst to a location
+                                alloca(bs, stmt.dst, code);
+                                memcpyRaxToStack(bs, code);
+                            } else {
+                                // Leave the data on the stack for now
+                                dst = dataSrc;
+                            }
+                        }
+
+                        if (dst != null) {
+                            dataMapping.put(stmt.dst, dst);
+                        }
                     }
                     ++popIntParam;
                     break;
-                }
                 case INT_LT:
                     intCmp("setl", code, stmt);
                     break;
