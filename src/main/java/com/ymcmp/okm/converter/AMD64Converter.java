@@ -773,7 +773,7 @@ public class AMD64Converter implements Converter {
                 code.add("    imul " + accum + ", " + accum + ", " + scale);
             }
         } else {
-            code.add("    imul " + toWordSizeString(bs) + " " + dataMapping.get(stmt.rhs));
+            code.add("    imul " + toWordSizeString(bs) + " " + getNumber(stmt.rhs));
         }
 
         code.add("    mov " + getOrAllocSite(bs, stmt.dst) + ", " + accum);
@@ -792,7 +792,7 @@ public class AMD64Converter implements Converter {
             code.add("    mov " + tmp + ", " + scale);
             code.add("    idiv " + tmp);
         } else {
-            code.add("    idiv " + dataMapping.get(stmt.rhs));
+            code.add("    idiv " + toWordSizeString(bs) + " " + getNumber(stmt.rhs));
         }
 
         code.add("    mov " + getOrAllocSite(bs, stmt.dst) + ", " + resultReg);
