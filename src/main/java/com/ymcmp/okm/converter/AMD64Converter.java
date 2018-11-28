@@ -378,13 +378,13 @@ public class AMD64Converter implements Converter {
                     } else {
                         moveSignExtend(bs, code, getNumber(stmt.dst));
                     }
-                    generateFuncEpilogue(funcEpilogue);
-                    funcEpilogue.add("    ret");
+                    generateFuncEpilogue(code);
+                    code.add("    ret");
                     break;
                 }
                 case RETURN_UNIT:
-                    generateFuncEpilogue(funcEpilogue);
-                    funcEpilogue.add("    ret");
+                    generateFuncEpilogue(code);
+                    code.add("    ret");
                     break;
                 case CALL_NATIVE:
                     // Almost like a tail call, except it doesnt need prologue or epilogue
@@ -394,8 +394,8 @@ public class AMD64Converter implements Converter {
                     funcEpilogue.clear();
                     code.clear();
 
-                    funcEpilogue.add("    ;;@ native call");
-                    funcEpilogue.add("    jmp _" + stmt.dst);
+                    code.add("    ;;@ native call");
+                    code.add("    jmp _" + stmt.dst);
 
                     funcPrologue.add(0, "    extern _" + stmt.dst);
                     break;
@@ -431,9 +431,9 @@ public class AMD64Converter implements Converter {
                     break;
                 case TAILCALL:
                     pushIntParam = pushFloatParam = 0;
-                    generateFuncEpilogue(funcEpilogue);
-                    funcEpilogue.add("    ;;@ tailcall");
-                    funcEpilogue.add("    jmp " + getNumber(stmt.dst));
+                    generateFuncEpilogue(code);
+                    code.add("    ;;@ tailcall");
+                    code.add("    jmp " + getNumber(stmt.dst));
                     break;
                 case PUSH_PARAM_INT: {
                     final int bs = stmt.getDataSize() / 8;
@@ -549,12 +549,25 @@ public class AMD64Converter implements Converter {
             funcPrologue.add("    sub rsp, " + relocate);
             funcEpilogue.add(0, "    add rsp, " + relocate);
         }
-        sectText.add(Stream.concat(Stream.concat(funcPrologue.stream(), code.stream()), funcEpilogue.stream())
+
+        final int epilogueSize = funcEpilogue.size();
+        if (epilogueSize > 0) {
+            for (int i = 0; i < code.size(); ++i) {
+                if (code.get(i).equals(MARKER_EPILOGUE)) {
+                    code.addAll(++i, funcEpilogue);
+                    i += epilogueSize;
+                }
+            }
+        }
+
+        sectText.add(Stream.concat(funcPrologue.stream(), code.stream())
                 .collect(Collectors.joining("\n")));
     }
 
+    private final static String MARKER_EPILOGUE = "    ;;@ epilogue";
+
     private static void generateFuncEpilogue(final List<String> code) {
-        code.add("    ;;@ epilogue");
+        code.add(MARKER_EPILOGUE);
         code.add("    pop rbp");
     }
 
