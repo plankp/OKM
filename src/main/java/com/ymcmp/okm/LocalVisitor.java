@@ -230,16 +230,18 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
                     visitBlock(fctx.bodyBlock);
                 }
 
-                // Perform optimization only if program is *correct*
                 final EliminateNopPass eliminateNop = new EliminateNopPass();
-                for (int i = 0; i < 2; ++i) {
+                int sizeBeforePass = 0;
+                do {
+                    sizeBeforePass = funcStmts.size();
+                    // Perform optimization only if program is *correct*
                     for (final Pass pass : OPT_PASSES) {
                         pass.process(mangledName, funcStmts);
                         pass.reset();
                         eliminateNop.process(mangledName, funcStmts);
                         eliminateNop.reset();
                     }
-                }
+                } while (sizeBeforePass != funcStmts.size());
 
                 // Functions *must* end with either a branching instruction
                 // next if block will be true If funcStmts does not end with a branch op

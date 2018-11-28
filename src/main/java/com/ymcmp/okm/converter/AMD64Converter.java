@@ -568,34 +568,39 @@ public class AMD64Converter implements Converter {
         // Strip unused jump labels
         code.removeIf(e -> e.startsWith("  .L") && usedLabels.stream().noneMatch(k -> e.equals("  " + k + ":")));
 
-        for (int i = 0; i < code.size() - 2; ++i) {
-            if (code.get(i).equals(MARKER_DST_TEMP)) {
-                final String line1 = code.get(i + 1);
-                final String line2 = code.get(i + 2);
+        int size = 0;
+        do {
+            size = code.size();
+            for (int i = 0; i < code.size() - 2; ++i) {
+                if (code.get(i).equals(MARKER_DST_TEMP)) {
+                    final String line1 = code.get(i + 1);
+                    final String line2 = code.get(i + 2);
 
-                try {
-                    final String data1 = getLeftData(line1);
-                    final String data2 = getRightData(line2);
-                    if (data1.equals(data2)) {
-                        // op1 [rbp + 12], a
-                        // op2 b, [rbp + 12]
-                        // is transformed into op2 b, a
-                        final String lhs = getLeftData(line2);
-                        final String rhs = getRightData(line1);
-                        if (lhs.equals(rhs)) {
-                            code.set(i + 1, "");
-                        } else {
-                            code.set(i + 1, getOpcode(line2) + lhs + "," + rhs);
+                    try {
+                        final String data1 = getLeftData(line1);
+                        final String data2 = getRightData(line2);
+                        if (data1.equals(data2)) {
+                            // op1 [rbp + 12], a
+                            // op2 b, [rbp + 12]
+                            // is transformed into op2 b, a
+                            final String lhs = getLeftData(line2);
+                            final String rhs = getRightData(line1);
+
+                            code.remove(i + 2);
+                            if (lhs.equals(rhs)) {
+                                code.remove(i + 1);
+                            } else {
+                                code.set(i + 1, getOpcode(line2) + lhs + "," + rhs);
+                            }
+
+                            code.remove(i);
                         }
-                        code.remove(i + 2);
+                    } catch (StringIndexOutOfBoundsException ex) {
+                        // Doesnt match, ignore
                     }
-                } catch (StringIndexOutOfBoundsException ex) {
-                    // Doesnt match, ignore
                 }
-                code.remove(i);
-                if (code.get(i).isEmpty()) code.remove(i);
             }
-        }
+        } while (size != code.size());
 
         if (moveRSP) {
             final int relocate = roundToNextDivisible(stackOffset, 16) - 16;
