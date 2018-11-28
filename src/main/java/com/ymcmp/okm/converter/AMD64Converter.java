@@ -543,9 +543,11 @@ public class AMD64Converter implements Converter {
         }
 
         if (moveRSP) {
-            final int relocate = roundToNextDivisible(stackOffset, 16);
-            funcPrologue.add("    sub rsp, " + relocate);
-            funcEpilogue.add(0, "    add rsp, " + relocate);
+            final int relocate = roundToNextDivisible(stackOffset, 16) - 16;
+            if (relocate > 0) {
+                funcPrologue.add("    sub rsp, " + relocate);
+                funcEpilogue.add(0, "    add rsp, " + relocate);
+            }
         } else if (stackOffset > 128) {
             // Stack is more than red-zone, need relocate rsp
             final int relocate = stackOffset - 128;
