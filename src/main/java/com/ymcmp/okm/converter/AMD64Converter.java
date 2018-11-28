@@ -128,21 +128,36 @@ public class AMD64Converter implements Converter {
                     code.add("    mov " + getOrAllocSite(4, stmt.dst, code) + ", edi");
                     break;
                 case CONV_INT_FLOAT:
-                    int2Float(false, false, code, stmt);
+                    int2Float(false, code, stmt);
+                    break;
+                case CONV_FLOAT_INT:
+                    float2Int(false, false, code, stmt);
                     break;
                 case CONV_LONG_FLOAT:
-                    int2Float(true, false, code, stmt);
+                    int2Float(false, code, stmt);
+                    break;
+                case CONV_FLOAT_LONG:
+                    float2Int(false, true, code, stmt);
                     break;
                 case CONV_INT_DOUBLE:
-                    int2Float(false, true, code, stmt);
+                    int2Float(true, code, stmt);
+                    break;
+                case CONV_DOUBLE_INT:
+                    float2Int(true, false, code, stmt);
                     break;
                 case CONV_LONG_DOUBLE:
-                    int2Float(true, true, code, stmt);
+                    int2Float(true, code, stmt);
+                    break;
+                case CONV_DOUBLE_LONG:
+                    float2Int(true, true, code, stmt);
                     break;
                 case CONV_FLOAT_DOUBLE:
-                    code.add("    movss xmm0, " + getNumber(stmt.lhs));
-                    code.add("    cvtss2sd xmm0, xmm0");
+                    code.add("    cvtss2sd xmm0, " + getNumber(stmt.lhs));
                     code.add("    movsd " + getOrAllocSite(8, stmt.dst, code) + ", xmm0");
+                    break;
+                case CONV_DOUBLE_FLOAT:
+                    code.add("    cvtsd2ss xmm0, " + getNumber(stmt.lhs));
+                    code.add("    movss " + getOrAllocSite(4, stmt.dst, code) + ", xmm0");
                     break;
                 case DOUBLE_ADD:
                     floatSSEMath(true, "add", code, stmt);
@@ -868,13 +883,15 @@ public class AMD64Converter implements Converter {
         code.add("    mov " + getOrAllocSite(1, stmt.dst, code) + ", " + (value ? "1" : "0"));
     }
 
-    private void int2Float(boolean quadIn, boolean quadOut, List<String> code, Statement stmt) {
-        final String input = quadIn ? "rdi" : "edi";
-        final String convOp = quadOut ? "cvtsi2sd" : "cvtsi2ss";
-        final String outOp = quadOut ? "movsd" : "movss";
-        code.add("    mov " + input + ", " + getNumber(stmt.lhs));
-        code.add("    " + convOp + " xmm1, " + input);
-        code.add("    " + outOp + " " + getOrAllocSite(quadOut ? 8 : 4, stmt.dst, code) + ", xmm1");
+    private void int2Float(boolean quad, List<String> code, Statement stmt) {
+        final String convOp = quad ? "cvtsi2sd" : "cvtsi2ss";
+        final String movOp = quad ? "movsd" : "movss";
+        code.add("    " + convOp + " xmm1, " + getNumber(stmt.lhs));
+        code.add("    " + movOp + " " + getOrAllocSite(quad ? 8 : 4, stmt.dst, code) + ", xmm1");
+    }
+
+    private void float2Int(boolean quadIn, boolean quadOut, List<String> code, Statement stmt) {
+        code.add("    " + (quadIn ? "cvtsd2si" : "cvtss2si") + " " + getOrAllocSite(quadOut ? 8 : 4, stmt.dst, code) + ", " + getNumber(stmt.lhs));
     }
 
     private void floatSSEMath(boolean quad, String opPrefix, List<String> code, Statement stmt) {
