@@ -81,6 +81,7 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
         OPT_PASSES.add(new ConstantFoldPass());
         OPT_PASSES.add(new TailCallPass());
         OPT_PASSES.add(new EliminateDeadCodePass());
+        OPT_PASSES.add(new ComSwapPass());
     }
 
     private final EntryNamingStrategy NAMING_STRAT = new EntryNamingStrategy() {
