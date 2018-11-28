@@ -48,7 +48,7 @@ public class AMD64Converter implements Converter {
     public String getResult() {
         return Stream.concat(Stream.concat(
                 Stream.concat(Stream.of(SECTION_DATA_HEADER), sectData.values().stream().map(DataValue::output)),
-                Stream.concat(Stream.of(SECTION_BSS_HEADER), sectBss.values().stream().map(e -> e.startsWith("??") ? "extern " + e.substring(2) : e))),
+                Stream.concat(Stream.of(SECTION_BSS_HEADER), sectBss.values().stream())),
                 Stream.concat(Stream.of(SECTION_TEXT_HEADER), sectText.stream()))
                 .collect(Collectors.joining("\n\n"));
     }
@@ -637,7 +637,7 @@ public class AMD64Converter implements Converter {
             }
             // global variable
             if (!sectBss.containsKey(handle)) {
-                sectBss.put(handle, "??" + mangled);
+                sectBss.put(handle, "    extern " + mangled);
             }
             return String.format("[rel %s]", mangled);
         }
@@ -901,7 +901,7 @@ public class AMD64Converter implements Converter {
             // global variable
             final String mangled = mangleName(handle);
             loc = String.format("[rel %s]", mangled);
-            if (!sectBss.containsKey(handle) || sectBss.get(handle).startsWith("??")) {
+            if (!sectBss.containsKey(handle) || sectBss.get(handle).startsWith("    extern ")) {
                 sectBss.put(handle, mangled + ": " + toBssSizeString(bs) + " 1");
             }
         } else {
