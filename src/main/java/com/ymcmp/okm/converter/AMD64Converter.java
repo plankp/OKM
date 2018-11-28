@@ -755,7 +755,7 @@ public class AMD64Converter implements Converter {
                 code.add("    imul " + accum + ", " + accum + ", " + scale);
             }
         } else {
-            code.add("    imul " + toWordSizeString(bs) + dataMapping.get(stmt.rhs));
+            code.add("    imul " + toWordSizeString(bs) + " " + dataMapping.get(stmt.rhs));
         }
 
         code.add("    mov " + getOrAllocSite(bs, stmt.dst) + ", " + accum);
