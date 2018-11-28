@@ -144,10 +144,29 @@ public class Machine {
                     case CONV_INT_LONG: //      dst:result, lhs:base
                         locals.put(stmt.dst, new Fixnum(toLong(fetchValue(stmt.lhs))));
                         break;
+                    case CONV_INT_FLOAT: //     dst:result, lhs:base
+                    case CONV_LONG_FLOAT: //    dst:result, lhs:base
+                        locals.put(stmt.dst, new Fixnum(toFloat(fetchValue(stmt.lhs))));
+                        break;
+                    case CONV_FLOAT_INT: //     dst:result, lhs:base
+                        locals.put(stmt.dst, new Fixnum((int) toFloat(fetchValue(stmt.lhs)), Integer.SIZE));
+                        break;
+                    case CONV_FLOAT_LONG: //    dst:result, lhs:base
+                        locals.put(stmt.dst, new Fixnum((long) toFloat(fetchValue(stmt.lhs))));
+                        break;
                     case CONV_INT_DOUBLE: //    dst:result, lhs:base
                     case CONV_LONG_DOUBLE: //   dst:result, lhs:base
                     case CONV_FLOAT_DOUBLE: //  dst:result, lhs:base
                         locals.put(stmt.dst, new Fixnum(toDouble(fetchValue(stmt.lhs))));
+                        break;
+                    case CONV_DOUBLE_FLOAT: //  dst:result, lhs:base
+                        locals.put(stmt.dst, new Fixnum((float) toDouble(fetchValue(stmt.lhs))));
+                        break;
+                    case CONV_DOUBLE_LONG: //   dst:result, lhs:base
+                        locals.put(stmt.dst, new Fixnum((long) toDouble(fetchValue(stmt.lhs))));
+                        break;
+                    case CONV_DOUBLE_INT: //    dst:result, lhs:base
+                        locals.put(stmt.dst, new Fixnum((int) toDouble(fetchValue(stmt.lhs)), Integer.SIZE));
                         break;
                     case INT_LT:        //      dst:result, lhs:a, rhs:b
                         locals.put(stmt.dst, makeBool(toInt(fetchValue(stmt.lhs)) < toInt(fetchValue(stmt.rhs))));
