@@ -330,9 +330,12 @@ public class AMD64Converter implements Converter {
                     break;
                 case REFER_ATTR: {
                     final int bs = stmt.getDataSize() / 8;
+                    final StringBuilder structHead = new StringBuilder(getNumber(stmt.lhs));
+                    structHead
+                            .insert(structHead.length() - 1, " + ")
+                            .insert(structHead.length() - 1, Long.parseLong(((Fixnum) stmt.rhs).value) / 8);
 
-                    code.add("    mov rax, " + getNumber(stmt.lhs));
-                    code.add("    add rax, " + (Long.parseLong(((Fixnum) stmt.rhs).value) / 8));
+                    code.add("    lea rax, " + structHead);
                     code.add("    mov " + getOrAllocSite(8, stmt.dst) + ", rax");
                     break;
                 }
