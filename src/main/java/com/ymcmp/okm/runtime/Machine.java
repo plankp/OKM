@@ -331,9 +331,13 @@ public class Machine {
                         }
                         break;
                     case POP_PARAM_INT: //      dst:store
-                    case POP_PARAM_FLOAT: //    dst:store
-                        locals.put(stmt.dst, callStack.pop());
+                    case POP_PARAM_FLOAT: { //  dst:store
+                        final Value param = callStack.pop();
+                        if (stmt.dst != null) {
+                            locals.put(stmt.dst, param);
+                        }
                         break;
+                    }
                     case PUSH_PARAM_INT: //     dst:value
                     case PUSH_PARAM_FLOAT: //   dst:value
                         // Pass by value, (including structs)

@@ -196,4 +196,20 @@ public enum Operation {
                 return null;
         }
     }
+
+    public boolean isCommutative() {
+        switch (this) {
+            case INT_ADD:
+            case INT_MUL:
+            case LONG_ADD:
+            case LONG_MUL:
+            case FLOAT_ADD:
+            case FLOAT_MUL:
+            case DOUBLE_ADD:
+            case DOUBLE_MUL:
+                return true;
+            default:
+                return false;
+        }
+    }
 }
