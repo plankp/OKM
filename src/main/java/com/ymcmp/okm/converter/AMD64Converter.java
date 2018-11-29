@@ -128,21 +128,36 @@ public class AMD64Converter implements Converter {
                     code.add("    mov " + getOrAllocSite(4, stmt.dst, code) + ", edi");
                     break;
                 case CONV_INT_FLOAT:
-                    int2Float(false, false, code, stmt);
+                    int2Float(false, code, stmt);
+                    break;
+                case CONV_FLOAT_INT:
+                    float2Int(false, false, code, stmt);
                     break;
                 case CONV_LONG_FLOAT:
-                    int2Float(true, false, code, stmt);
+                    int2Float(false, code, stmt);
+                    break;
+                case CONV_FLOAT_LONG:
+                    float2Int(false, true, code, stmt);
                     break;
                 case CONV_INT_DOUBLE:
-                    int2Float(false, true, code, stmt);
+                    int2Float(true, code, stmt);
+                    break;
+                case CONV_DOUBLE_INT:
+                    float2Int(true, false, code, stmt);
                     break;
                 case CONV_LONG_DOUBLE:
-                    int2Float(true, true, code, stmt);
+                    int2Float(true, code, stmt);
+                    break;
+                case CONV_DOUBLE_LONG:
+                    float2Int(true, true, code, stmt);
                     break;
                 case CONV_FLOAT_DOUBLE:
-                    code.add("    movss xmm0, " + getNumber(stmt.lhs));
-                    code.add("    cvtss2sd xmm0, xmm0");
+                    code.add("    cvtss2sd xmm0, " + getNumber(stmt.lhs));
                     code.add("    movsd " + getOrAllocSite(8, stmt.dst, code) + ", xmm0");
+                    break;
+                case CONV_DOUBLE_FLOAT:
+                    code.add("    cvtsd2ss xmm0, " + getNumber(stmt.lhs));
+                    code.add("    movss " + getOrAllocSite(4, stmt.dst, code) + ", xmm0");
                     break;
                 case DOUBLE_ADD:
                     floatSSEMath(true, "add", code, stmt);
@@ -303,16 +318,12 @@ public class AMD64Converter implements Converter {
                 case INT_NE:
                     intCmp("setne", code, stmt);
                     break;
-                case LONG_CMP: {
-                    code.add("    xor ecx, ecx");
-                    code.add("    mov rax, " + getNumber(stmt.lhs));
-                    code.add("    cmp rax, " + getNumber(stmt.rhs));
-                    code.add("    setg cl");
-                    code.add("    mov eax, -1");
-                    code.add("    cmovge eax, ecx");
-                    code.add("    mov " + getOrAllocSite(1, stmt.dst, code) + ", al");
+                case INT_CMP:
+                    intCmp(false, code, stmt);
                     break;
-                }
+                case LONG_CMP:
+                    intCmp(true, code, stmt);
+                    break;
                 case FLOAT_CMP:
                     floatCmp(false, code, stmt);
                     break;
@@ -374,6 +385,24 @@ public class AMD64Converter implements Converter {
                     code.add("    jmp " + dst);
                     break;
                 }
+                case JUMP_INT_LT:
+                    intCmpJmp("jl", code, stmt, usedLabels);
+                    break;
+                case JUMP_INT_GT:
+                    intCmpJmp("jg", code, stmt, usedLabels);
+                    break;
+                case JUMP_INT_LE:
+                    intCmpJmp("jle", code, stmt, usedLabels);
+                    break;
+                case JUMP_INT_GE:
+                    intCmpJmp("jge", code, stmt, usedLabels);
+                    break;
+                case JUMP_INT_EQ:
+                    intCmpJmp("je", code, stmt, usedLabels);
+                    break;
+                case JUMP_INT_NE:
+                    intCmpJmp("jne", code, stmt, usedLabels);
+                    break;
                 case JUMP_IF_TRUE: {
                     // bool is 1 byte
                     final String dst = ".L" + ((Label) stmt.dst).getAddress();
@@ -856,6 +885,17 @@ public class AMD64Converter implements Converter {
         code.add("    mov " + getOrAllocSite(bs, stmt.dst, code) + ", " + resultReg);
     }
 
+    private void intCmp(boolean quad, List<String> code, Statement stmt) {
+        final String reg = getIntRegister(quad ? 8 : 4);
+        code.add("    xor ecx, ecx");
+        code.add("    mov " + reg + ", " + getNumber(stmt.lhs));
+        code.add("    cmp " + reg + ", " + getNumber(stmt.rhs));
+        code.add("    setg cl");
+        code.add("    mov eax, -1");
+        code.add("    cmovge eax, ecx");
+        code.add("    mov " + getOrAllocSite(1, stmt.dst, code) + ", al");
+    }
+
     private void intCmp(String cmpInstr, List<String> code, Statement stmt) {
         code.add("    xor ecx, ecx");
         code.add("    mov eax, " + getNumber(stmt.lhs));
@@ -868,13 +908,15 @@ public class AMD64Converter implements Converter {
         code.add("    mov " + getOrAllocSite(1, stmt.dst, code) + ", " + (value ? "1" : "0"));
     }
 
-    private void int2Float(boolean quadIn, boolean quadOut, List<String> code, Statement stmt) {
-        final String input = quadIn ? "rdi" : "edi";
-        final String convOp = quadOut ? "cvtsi2sd" : "cvtsi2ss";
-        final String outOp = quadOut ? "movsd" : "movss";
-        code.add("    mov " + input + ", " + getNumber(stmt.lhs));
-        code.add("    " + convOp + " xmm1, " + input);
-        code.add("    " + outOp + " " + getOrAllocSite(quadOut ? 8 : 4, stmt.dst, code) + ", xmm1");
+    private void int2Float(boolean quad, List<String> code, Statement stmt) {
+        final String convOp = quad ? "cvtsi2sd" : "cvtsi2ss";
+        final String movOp = quad ? "movsd" : "movss";
+        code.add("    " + convOp + " xmm1, " + getNumber(stmt.lhs));
+        code.add("    " + movOp + " " + getOrAllocSite(quad ? 8 : 4, stmt.dst, code) + ", xmm1");
+    }
+
+    private void float2Int(boolean quadIn, boolean quadOut, List<String> code, Statement stmt) {
+        code.add("    " + (quadIn ? "cvtsd2si" : "cvtss2si") + " " + getOrAllocSite(quadOut ? 8 : 4, stmt.dst, code) + ", " + getNumber(stmt.lhs));
     }
 
     private void floatSSEMath(boolean quad, String opPrefix, List<String> code, Statement stmt) {
@@ -995,6 +1037,14 @@ public class AMD64Converter implements Converter {
             code.add("    mov sil, [rax + " + iter + "]");
             code.add("    mov [rbp - " + stackOffset + " + " + iter + "], sil");
         }
+    }
+
+    private void intCmpJmp(String op, List<String> code, Statement stmt, HashSet<String> usedLabels) {
+        final String dst = ".L" + ((Label) stmt.dst).getAddress();
+        usedLabels.add(dst);
+        code.add("    mov eax, " + getNumber(stmt.lhs));
+        code.add("    cmp eax, " + getNumber(stmt.rhs));
+        code.add("    " + op + " " + dst);
     }
 
     private static String getLeftData(String str) {

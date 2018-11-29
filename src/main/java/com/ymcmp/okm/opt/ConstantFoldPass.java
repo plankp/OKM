@@ -37,10 +37,10 @@ public final class ConstantFoldPass implements Pass {
                 case CONV_INT_SHORT:
                 case CONV_INT_LONG:
                 case CONV_FLOAT_DOUBLE:
+                case CONV_DOUBLE_FLOAT:
                     if (safeIsNumeric(stmt.lhs)) {
                         final int newSize = getResultSize(stmt.op);
                         final Value newValue = ((Fixnum) stmt.lhs).changeSize(newSize);
-                        replacement.put(stmt.dst.toString(), newValue);
 
                         final Statement newStmt = new Statement(Operation.LOAD_NUMERAL, newValue, stmt.dst);
                         newStmt.setDataSize(newSize);
@@ -55,7 +55,20 @@ public final class ConstantFoldPass implements Pass {
                     if (safeIsNumeric(stmt.lhs)) {
                         final int newSize = getResultSize(stmt.op);
                         final Value newValue = new Fixnum(((Fixnum) stmt.lhs).value + ".0", newSize);
-                        replacement.put(stmt.dst.toString(), newValue);
+
+                        final Statement newStmt = new Statement(Operation.LOAD_NUMERAL, newValue, stmt.dst);
+                        newStmt.setDataSize(newSize);
+                        block.set(i--, newStmt);
+                        continue;
+                    }
+                    break;
+                case CONV_FLOAT_INT:
+                case CONV_FLOAT_LONG:
+                case CONV_DOUBLE_LONG:
+                case CONV_DOUBLE_INT:
+                    if (safeIsNumeric(stmt.lhs)) {
+                        final int newSize = getResultSize(stmt.op);
+                        final Value newValue = new Fixnum((long) Double.parseDouble(((Fixnum) stmt.lhs).value), newSize);
 
                         final Statement newStmt = new Statement(Operation.LOAD_NUMERAL, newValue, stmt.dst);
                         newStmt.setDataSize(newSize);
@@ -147,6 +160,7 @@ public final class ConstantFoldPass implements Pass {
                         case INT_GE:   newSize = Byte.SIZE; result = a <= b ? 1 : 0; break;
                         case INT_EQ:   newSize = Byte.SIZE; result = a == b ? 1 : 0; break;
                         case INT_NE:   newSize = Byte.SIZE; result = a != b ? 1 : 0; break;
+                        case INT_CMP:  newSize = Byte.SIZE; result = Integer.compare((int) a, (int) b); break;
                         case LONG_CMP: newSize = Byte.SIZE; result = Long.compare(a, b); break;
                         default:
                             // Not optimizable, not an error, just ignore
@@ -271,11 +285,16 @@ public final class ConstantFoldPass implements Pass {
             case CONV_BYTE_INT:     return Integer.SIZE;
             case CONV_SHORT_INT:    return Integer.SIZE;
             case CONV_LONG_INT:     return Integer.SIZE;
+            case CONV_FLOAT_INT:    return Integer.SIZE;
+            case CONV_DOUBLE_INT:   return Integer.SIZE;
             case CONV_INT_BYTE:     return Byte.SIZE;
             case CONV_INT_SHORT:    return Short.SIZE;
             case CONV_INT_LONG:     return Long.SIZE;
+            case CONV_FLOAT_LONG:   return Long.SIZE;
+            case CONV_DOUBLE_LONG:  return Long.SIZE;
             case CONV_INT_FLOAT:    return Float.SIZE;
             case CONV_LONG_FLOAT:   return Float.SIZE;
+            case CONV_DOUBLE_FLOAT: return Double.SIZE;
             case CONV_INT_DOUBLE:   return Double.SIZE;
             case CONV_LONG_DOUBLE:  return Double.SIZE;
             case CONV_FLOAT_DOUBLE: return Double.SIZE;
