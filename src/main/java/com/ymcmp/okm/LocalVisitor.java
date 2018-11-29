@@ -22,7 +22,6 @@ import org.antlr.v4.runtime.CommonTokenStream;
 
 import org.antlr.v4.runtime.tree.ParseTree;
 
-import com.ymcmp.okm.opt.*;
 import com.ymcmp.okm.tac.*;
 import com.ymcmp.okm.type.*;
 import com.ymcmp.okm.except.*;
@@ -41,8 +40,6 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
 
     // Only lowercase chars
     private static final Map<Character, Tuple<String, Integer>> NUM_LIT_INFO = new HashMap<>();
-
-    private static final List<Pass> OPT_PASSES = new ArrayList<>();
 
     private static final UnaryType TYPE_BYTE = UnaryType.getType("byte");
     private static final UnaryType TYPE_SHORT = UnaryType.getType("short");
@@ -76,14 +73,6 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
         NUM_LIT_INFO.put('l', new Tuple<>("long", Long.SIZE));
         NUM_LIT_INFO.put('f', new Tuple<>("float", Float.SIZE));
         NUM_LIT_INFO.put('d', new Tuple<>("double", Double.SIZE));
-
-        OPT_PASSES.add(new ReduceMovePass());
-        OPT_PASSES.add(new TailCallPass());
-        OPT_PASSES.add(new SquashCmpPass());
-        OPT_PASSES.add(new ConstantFoldPass());
-        OPT_PASSES.add(new EliminateDeadCodePass());
-        OPT_PASSES.add(new TempParamPass());
-        OPT_PASSES.add(new ComSwapPass());
     }
 
     private final EntryNamingStrategy NAMING_STRAT = new EntryNamingStrategy() {
@@ -230,19 +219,6 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
                     // Let the block visitor handle the function body
                     visitBlock(fctx.bodyBlock);
                 }
-
-                final EliminateNopPass eliminateNop = new EliminateNopPass();
-                int sizeBeforePass = 0;
-                do {
-                    sizeBeforePass = funcStmts.size();
-                    // Perform optimization only if program is *correct*
-                    for (final Pass pass : OPT_PASSES) {
-                        pass.process(mangledName, funcStmts);
-                        pass.reset();
-                        eliminateNop.process(mangledName, funcStmts);
-                        eliminateNop.reset();
-                    }
-                } while (sizeBeforePass != funcStmts.size());
 
                 // Functions *must* end with either a branching instruction
                 // next if block will be true If funcStmts does not end with a branch op

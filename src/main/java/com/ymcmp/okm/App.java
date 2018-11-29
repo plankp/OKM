@@ -14,6 +14,8 @@ import com.beust.jcommander.JCommander;
 import com.beust.jcommander.IStringConverter;
 import com.beust.jcommander.ParameterException;
 
+import com.ymcmp.okm.opt.*;
+
 import com.ymcmp.okm.tac.Statement;
 
 import com.ymcmp.okm.runtime.Machine;
@@ -55,6 +57,18 @@ public class App {
         }
     }
 
+    private static final List<Pass> OPT_PASSES = new ArrayList<>();
+
+    static {
+        OPT_PASSES.add(new ReduceMovePass());
+        OPT_PASSES.add(new TailCallPass());
+        OPT_PASSES.add(new SquashCmpPass());
+        OPT_PASSES.add(new ConstantFoldPass());
+        OPT_PASSES.add(new EliminateDeadCodePass());
+        OPT_PASSES.add(new TempParamPass());
+        OPT_PASSES.add(new ComSwapPass());
+    }
+
     public static void main(String[] args) {
         final Args argData = new Args();
         final JCommander instance = JCommander.newBuilder()
@@ -82,6 +96,20 @@ public class App {
 
         final Map<String, List<Statement>> result = new LocalVisitor(argData.importPath)
                 .compile(argData.inputPaths);
+
+        final EliminateNopPass eliminateNop = new EliminateNopPass();
+        result.forEach((name, funcIR) -> {
+            int sizeBeforePass = 0;
+            do {
+                sizeBeforePass = funcIR.size();
+                for (final Pass pass : OPT_PASSES) {
+                    pass.process(name, funcIR);
+                    pass.reset();
+                    eliminateNop.process(name, funcIR);
+                    eliminateNop.reset();
+                }
+            } while (sizeBeforePass != funcIR.size());
+        });
 
         if (argData.showIR) {
             final IRFormatter conv = new IRFormatter();
