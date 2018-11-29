@@ -23,13 +23,13 @@ public class AMD64Converter implements Converter {
             "    section .data\n" +
             "    align 16\n" +
             "CC0 dd 2147483648,0,0,0\n" +
-            "CC1 dd 0,-2147483648,0,0";
+            "CC1 dd 0,-2147483648,0,0\n";
 
     private static final String SECTION_BSS_HEADER =
-            "    section .bss";
+            "    section .bss\n";
 
     private static final String SECTION_TEXT_HEADER =
-            "    section .text";
+            "    section .text\n";
 
     private final static String MARKER_EPILOGUE = "    ;;@ epilogue";
     private final static String MARKER_DST_TEMP = "    ;;@ dst_temp";
@@ -58,12 +58,15 @@ public class AMD64Converter implements Converter {
     public String getResult() {
         final String namedef = globalNames.stream()
                 .map(e -> "  %define " + e + " " + e.substring(1))
-                .collect(Collectors.joining("\n", "%ifidn __OUTPUT_FORMAT__, elf64\n", "\n%endif\n\n"));
-        return Stream.concat(Stream.concat(
-                Stream.concat(Stream.of(SECTION_DATA_HEADER), sectData.values().stream().map(DataValue::output)),
-                Stream.concat(Stream.of(SECTION_BSS_HEADER), sectBss.values().stream())),
-                Stream.concat(Stream.of(SECTION_TEXT_HEADER), sectText.stream()))
-                .collect(Collectors.joining("\n\n", namedef, ""));
+                .collect(Collectors.joining("\n", "%ifidn __OUTPUT_FORMAT__, elf64\n", "\n%endif\n"));
+        final String data = sectData.values().stream()
+                .map(DataValue::output)
+                .collect(Collectors.joining("\n", SECTION_DATA_HEADER, ""));
+        final String bss = sectBss.values().stream()
+                .collect(Collectors.joining("\n", SECTION_BSS_HEADER, ""));
+        final String text = sectText.stream()
+                .collect(Collectors.joining("\n", SECTION_TEXT_HEADER, ""));
+        return namedef + '\n' + data + '\n' + bss + '\n' + text;
     }
 
     private static String mangleName(final String name) {
@@ -675,7 +678,7 @@ public class AMD64Converter implements Converter {
         }
 
         sectText.add(Stream.concat(funcPrologue.stream(), code.stream())
-                .collect(Collectors.joining("\n")));
+                .collect(Collectors.joining("\n", "", "\n")));
     }
 
     private static void generateFuncEpilogue(final List<String> code) {
