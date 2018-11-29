@@ -31,7 +31,7 @@ The assembly code does generate a main method.
 
 The assembly code uses an ABI similar to System V AMD64.
 
-The following is tested on Mac OS with clang compiler:
+The following is tested on Mac OS with clang and on Debian linux with gcc:
 
 If you add the appropriate `global` directives in the output assembly,
 you can call them from C. *Structs require extra care (see below)*
