@@ -29,54 +29,62 @@ public final class ConstantFoldPass implements Pass {
         for (int i = 0; i < block.size(); ++i) {
             final Statement stmt = block.get(i);
 
-            if (stmt.dst instanceof Register) {
-                switch (stmt.op) {
-                    case CONV_BYTE_INT:
-                    case CONV_SHORT_INT:
-                    case CONV_LONG_INT:
-                    case CONV_INT_BYTE:
-                    case CONV_INT_SHORT:
-                    case CONV_INT_LONG:
-                    case CONV_FLOAT_DOUBLE:
-                        if (safeIsNumeric(stmt.lhs)) {
-                            final int newSize = getResultSize(stmt.op);
-                            final Value newValue = ((Fixnum) stmt.lhs).changeSize(newSize);
-                            replacement.put(stmt.dst.toString(), newValue);
+            switch (stmt.op) {
+                case CONV_BYTE_INT:
+                case CONV_SHORT_INT:
+                case CONV_LONG_INT:
+                case CONV_INT_BYTE:
+                case CONV_INT_SHORT:
+                case CONV_INT_LONG:
+                case CONV_FLOAT_DOUBLE:
+                    if (safeIsNumeric(stmt.lhs)) {
+                        final int newSize = getResultSize(stmt.op);
+                        final Value newValue = ((Fixnum) stmt.lhs).changeSize(newSize);
+                        replacement.put(stmt.dst.toString(), newValue);
 
-                            final Statement newStmt = new Statement(Operation.LOAD_NUMERAL, newValue, stmt.dst);
-                            newStmt.setDataSize(newSize);
-                            block.set(i--, newStmt);
-                            continue;
-                        }
-                        break;
-                    case CONV_INT_FLOAT:
-                    case CONV_LONG_FLOAT:
-                    case CONV_INT_DOUBLE:
-                    case CONV_LONG_DOUBLE:
-                        if (safeIsNumeric(stmt.lhs)) {
-                            final int newSize = getResultSize(stmt.op);
-                            final Value newValue = new Fixnum(((Fixnum) stmt.lhs).value + ".0", newSize);
-                            replacement.put(stmt.dst.toString(), newValue);
+                        final Statement newStmt = new Statement(Operation.LOAD_NUMERAL, newValue, stmt.dst);
+                        newStmt.setDataSize(newSize);
+                        block.set(i--, newStmt);
+                        continue;
+                    }
+                    break;
+                case CONV_INT_FLOAT:
+                case CONV_LONG_FLOAT:
+                case CONV_INT_DOUBLE:
+                case CONV_LONG_DOUBLE:
+                    if (safeIsNumeric(stmt.lhs)) {
+                        final int newSize = getResultSize(stmt.op);
+                        final Value newValue = new Fixnum(((Fixnum) stmt.lhs).value + ".0", newSize);
+                        replacement.put(stmt.dst.toString(), newValue);
 
-                            final Statement newStmt = new Statement(Operation.LOAD_NUMERAL, newValue, stmt.dst);
-                            newStmt.setDataSize(newSize);
-                            block.set(i--, newStmt);
-                            continue;
-                        }
-                        break;
-                }
+                        final Statement newStmt = new Statement(Operation.LOAD_NUMERAL, newValue, stmt.dst);
+                        newStmt.setDataSize(newSize);
+                        block.set(i--, newStmt);
+                        continue;
+                    }
+                    break;
             }
 
             // Attempt to perform substitution
             switch (stmt.op) {
                 case LOAD_NUMERAL:
-                    if (safeIsNumeric(stmt.lhs)) replacement.put(stmt.dst.toString(), stmt.lhs);
+                    replacement.put(stmt.dst.toString(), stmt.lhs);
                     break;
                 case LOAD_TRUE:
                     replacement.put(stmt.dst.toString(), Fixnum.TRUE);
                     break;
                 case LOAD_FALSE:
                     replacement.put(stmt.dst.toString(), Fixnum.FALSE);
+                    break;
+                case REFER_VAR:
+                    if (replacement.containsKey(safeToString(stmt.lhs))) {
+                        // If folding was allowed, it will be creating a pointer out
+                        // of a non-memory-address (which is wrong!)
+                        //
+                        // Disable folding completely in this case since pointers can
+                        // be iffy when it comes to predicting values.
+                        replacement.remove(stmt.lhs.toString());
+                    }
                     break;
                 default:
                     if (replacement.containsKey(safeToString(stmt.dst))) {
@@ -85,19 +93,13 @@ public final class ConstantFoldPass implements Pass {
                             final Statement repl = new Statement(stmt.op, stmt.lhs, stmt.rhs, newDst);
                             repl.setDataSize(stmt.getDataSize());
                             block.set(i--, repl);
-                            continue;
+                        } else {
+                            // This block will undo the previous substitution
+                            // because register is modified and cached value is wrong
+                            replacement.remove(stmt.dst.toString());
                         }
-                        // This block will undo the previous substitution
-                        // because register is modified and cached value is wrong
-                        replacement.remove(stmt.dst.toString());
-                    } else if (stmt.op == Operation.REFER_VAR && replacement.containsKey(safeToString(stmt.lhs))) {
-                        // If folding was allowed, it will be creating a pointer out
-                        // of a non-memory-address (which is wrong!)
-                        //
-                        // Disable folding completely in this case since pointers can
-                        // be iffy when it comes to predicting values.
-                        replacement.remove(stmt.lhs.toString());
                     }
+                    break;
             }
         }
     }
