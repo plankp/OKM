@@ -186,6 +186,9 @@ public class Machine {
                     case INT_NE:        //      dst:result, lhs:a, rhs:b
                         locals.put(stmt.dst, makeBool(toInt(fetchValue(stmt.lhs)) != toInt(fetchValue(stmt.rhs))));
                         break;
+                    case INT_CMP:       //      dst:result, lhs:a, rhs:b
+                        locals.put(stmt.dst, new Fixnum(Integer.compare(toInt(fetchValue(stmt.lhs)), toInt(fetchValue(stmt.rhs))), Integer.SIZE));
+                        break;
                     case INT_NEG:       //      dst:result, lhs:base
                         locals.put(stmt.dst, new Fixnum(-toInt(fetchValue(stmt.lhs)), Integer.SIZE));
                         break;

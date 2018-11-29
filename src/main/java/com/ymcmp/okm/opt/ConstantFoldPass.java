@@ -145,6 +145,7 @@ public final class ConstantFoldPass implements Pass {
                         case INT_GE:   newSize = Byte.SIZE; result = a <= b ? 1 : 0; break;
                         case INT_EQ:   newSize = Byte.SIZE; result = a == b ? 1 : 0; break;
                         case INT_NE:   newSize = Byte.SIZE; result = a != b ? 1 : 0; break;
+                        case INT_CMP:  newSize = Byte.SIZE; result = Integer.compare((int) a, (int) b); break;
                         case LONG_CMP: newSize = Byte.SIZE; result = Long.compare(a, b); break;
                         default:
                             // Not optimizable, not an error, just ignore

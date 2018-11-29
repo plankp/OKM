@@ -318,16 +318,12 @@ public class AMD64Converter implements Converter {
                 case INT_NE:
                     intCmp("setne", code, stmt);
                     break;
-                case LONG_CMP: {
-                    code.add("    xor ecx, ecx");
-                    code.add("    mov rax, " + getNumber(stmt.lhs));
-                    code.add("    cmp rax, " + getNumber(stmt.rhs));
-                    code.add("    setg cl");
-                    code.add("    mov eax, -1");
-                    code.add("    cmovge eax, ecx");
-                    code.add("    mov " + getOrAllocSite(1, stmt.dst, code) + ", al");
+                case INT_CMP:
+                    intCmp(false, code, stmt);
                     break;
-                }
+                case LONG_CMP:
+                    intCmp(true, code, stmt);
+                    break;
                 case FLOAT_CMP:
                     floatCmp(false, code, stmt);
                     break;
@@ -869,6 +865,17 @@ public class AMD64Converter implements Converter {
         }
 
         code.add("    mov " + getOrAllocSite(bs, stmt.dst, code) + ", " + resultReg);
+    }
+
+    private void intCmp(boolean quad, List<String> code, Statement stmt) {
+        final String reg = getIntRegister(quad ? 8 : 4);
+        code.add("    xor ecx, ecx");
+        code.add("    mov " + reg + ", " + getNumber(stmt.lhs));
+        code.add("    cmp " + reg + ", " + getNumber(stmt.rhs));
+        code.add("    setg cl");
+        code.add("    mov eax, -1");
+        code.add("    cmovge eax, ecx");
+        code.add("    mov " + getOrAllocSite(1, stmt.dst, code) + ", al");
     }
 
     private void intCmp(String cmpInstr, List<String> code, Statement stmt) {

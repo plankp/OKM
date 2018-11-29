@@ -32,6 +32,8 @@ public enum Operation {
     INT_EQ,
     INT_NE,
 
+    INT_CMP,
+
     INT_NEG,
     INT_CPL,
 
@@ -117,6 +119,7 @@ public enum Operation {
 
     public boolean isCmp() {
         switch (this) {
+            case INT_CMP:
             case LONG_CMP:
             case FLOAT_CMP:
             case DOUBLE_CMP:
