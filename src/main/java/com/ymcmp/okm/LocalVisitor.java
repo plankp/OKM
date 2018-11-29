@@ -414,19 +414,28 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
 
     @Override
     public Type visitType(TypeContext ctx) {
-        if (ctx.inner == null) {
-            final String name = ctx.getText();
-            final Module.Entry ent = currentModule.get(name);
-            if (ent != null && ent.isType) {
-                final Type t = ent.type;
-                if (t instanceof EnumType) {
-                    return ((EnumType) t).createCorrespondingKey();
-                }
-                return t;
-            }
-            throw new UndefinedOperationException(name + " does not name a type");
+        if (ctx.inner != null) {
+            return new Pointer(visitType(ctx.inner));
         }
-        return new Pointer(visitType(ctx.inner));
+        if (ctx.ret != null) {
+            final Type ret = visitType(ctx.ret);
+            final Type[] params = new Type[ctx.getChildCount() / 2 - 1];
+            for (int i = 0; i < params.length; ++i) {
+                params[i] = visitType((TypeContext) ctx.getChild((i + 1) * 2));
+            }
+            return new FuncType(ret, params);
+        }
+
+        final String name = ctx.getText();
+        final Module.Entry ent = currentModule.get(name);
+        if (ent != null && ent.isType) {
+            final Type t = ent.type;
+            if (t instanceof EnumType) {
+                return ((EnumType) t).createCorrespondingKey();
+            }
+            return t;
+        }
+        throw new UndefinedOperationException(name + " does not name a type");
     }
 
     @Override
