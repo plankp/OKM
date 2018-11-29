@@ -38,6 +38,8 @@ public class AMD64Converter implements Converter {
     private final Map<String, String> sectBss = new HashMap<>();
     private final List<String> sectText = new ArrayList<>();
 
+    private final HashSet<String> globalNames = new HashSet<>();
+
     private final List<String> funcPrologue = new ArrayList<>();
     private final List<String> funcEpilogue = new ArrayList<>();
     private final HashMap<Value, String> dataMapping = new HashMap<>();
@@ -48,15 +50,20 @@ public class AMD64Converter implements Converter {
         sectData.clear();
         sectBss.clear();
         sectText.clear();
+
+        globalNames.clear();
     }
 
     @Override
     public String getResult() {
+        final String namedef = globalNames.stream()
+                .map(e -> "  %define " + e + " " + e.substring(1))
+                .collect(Collectors.joining("\n", "%ifidn __OUTPUT_FORMAT__, elf64\n", "\n%endif\n\n"));
         return Stream.concat(Stream.concat(
                 Stream.concat(Stream.of(SECTION_DATA_HEADER), sectData.values().stream().map(DataValue::output)),
                 Stream.concat(Stream.of(SECTION_BSS_HEADER), sectBss.values().stream())),
                 Stream.concat(Stream.of(SECTION_TEXT_HEADER), sectText.stream()))
-                .collect(Collectors.joining("\n\n"));
+                .collect(Collectors.joining("\n\n", namedef, ""));
     }
 
     private static String mangleName(final String name) {
@@ -78,6 +85,7 @@ public class AMD64Converter implements Converter {
 
         if (name.equals("@init")) {
             // This is the equivalent of the int main function in C
+            globalNames.add("_main");
             funcPrologue.add("    global _main");
             funcPrologue.add("_main:");
 
@@ -446,7 +454,7 @@ public class AMD64Converter implements Converter {
                     generateFuncEpilogue(code);
                     code.add("    ret");
                     break;
-                case CALL_NATIVE:
+                case CALL_NATIVE: {
                     // Almost like a tail call, except it doesnt need prologue or epilogue
                     // it just jumps!
                     pushIntParam = pushFloatParam = 0;
@@ -454,11 +462,14 @@ public class AMD64Converter implements Converter {
                     funcEpilogue.clear();
                     code.clear();
 
+                    final String nativeName = "_" + stmt.dst;
+                    globalNames.add(nativeName);
                     code.add("    ;;@ native call");
-                    code.add("    jmp _" + stmt.dst);
+                    code.add("    jmp " + nativeName);
 
-                    funcPrologue.add(0, "    extern _" + stmt.dst);
+                    funcPrologue.add(0, "    extern " + nativeName);
                     break;
+                }
                 case CALL_INT: {
                     moveRSP = true;
                     pushIntParam = pushFloatParam = 0;
@@ -733,6 +744,7 @@ public class AMD64Converter implements Converter {
             }
             // global variable
             if (!sectBss.containsKey(handle)) {
+                globalNames.add(mangled);
                 sectBss.put(handle, "    extern " + mangled);
             }
             return String.format("[rel %s]", mangled);
