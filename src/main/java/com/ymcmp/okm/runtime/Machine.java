@@ -7,6 +7,10 @@ import java.util.Random;
 import java.util.HashMap;
 import java.util.Collections;
 
+import java.util.stream.Collectors;
+
+import com.ymcmp.okm.FuncBlock;
+
 import com.ymcmp.okm.tac.*;
 
 public class Machine {
@@ -16,7 +20,9 @@ public class Machine {
 
     private static final Random RND = new Random();
 
-    public Value execute(final Map<String, List<Statement>> code) {
+    public Value execute(final Map<String, FuncBlock> chunk) {
+        final Map<String, List<Statement>> code = chunk.entrySet().stream()
+                .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().code));
         // Call the initializer if it exists
         final List<Statement> initializer = code.get("@init");
         if (initializer != null) {

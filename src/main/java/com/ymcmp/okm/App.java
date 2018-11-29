@@ -94,21 +94,21 @@ public class App {
 
         LocalVisitor.LOGGER.setLevel(argData.debug ? Level.INFO : Level.OFF);
 
-        final Map<String, List<Statement>> result = new LocalVisitor(argData.importPath)
+        final Map<String, FuncBlock> result = new LocalVisitor(argData.importPath)
                 .compile(argData.inputPaths);
 
         final EliminateNopPass eliminateNop = new EliminateNopPass();
-        result.forEach((name, funcIR) -> {
+        result.forEach((name, func) -> {
             int sizeBeforePass = 0;
             do {
-                sizeBeforePass = funcIR.size();
+                sizeBeforePass = func.code.size();
                 for (final Pass pass : OPT_PASSES) {
-                    pass.process(name, funcIR);
+                    pass.process(name, func.code);
                     pass.reset();
-                    eliminateNop.process(name, funcIR);
+                    eliminateNop.process(name, func.code);
                     eliminateNop.reset();
                 }
-            } while (sizeBeforePass != funcIR.size());
+            } while (sizeBeforePass != func.code.size());
         });
 
         if (argData.showIR) {

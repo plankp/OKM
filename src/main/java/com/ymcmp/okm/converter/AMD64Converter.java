@@ -9,6 +9,8 @@ import java.util.ArrayList;
 import java.util.stream.Stream;
 import java.util.stream.Collectors;
 
+import com.ymcmp.okm.FuncBlock;
+
 import com.ymcmp.okm.tac.Label;
 import com.ymcmp.okm.tac.Value;
 import com.ymcmp.okm.tac.Fixnum;
@@ -63,7 +65,11 @@ public class AMD64Converter implements Converter {
     }
 
     @Override
-    public void convert(final String name, final List<Statement> body) {
+    public void convert(final String name, final FuncBlock body) {
+        convert(name, body.code);
+    }
+
+    private void convert(final String name, final List<Statement> body) {
         // Reset necessary fields
         funcPrologue.clear();
         funcEpilogue.clear();
