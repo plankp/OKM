@@ -19,6 +19,11 @@ public final class SquashCmpPass implements Pass {
             final Statement next = block.get(i + 1);
 
             Operation synthOp = getEquivalentCmpJmp(stmt.op);
+            if (synthOp == null) {
+                // Not eligible, skip
+                continue;
+            }
+
             switch (next.op) {
                 case JUMP_IF_TRUE:
                     break;
