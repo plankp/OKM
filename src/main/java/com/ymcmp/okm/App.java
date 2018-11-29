@@ -35,8 +35,8 @@ public class App {
         @Parameter(names={"--debug"}, description="Run compiler in debug mode")
         private boolean debug = false;
 
-        @Parameter(names={"--show-ir"}, description="Shows intermediate representation after compilation", arity=1)
-        private boolean showIR = true;
+        @Parameter(names={"--show-ir"}, description="Shows intermediate representation after compilation")
+        private boolean showIR = false;
 
         @Parameter(names={"--exec-ir"}, description="Executes intermediate representation after compilation")
         private boolean execIR = false;
