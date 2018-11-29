@@ -8,12 +8,18 @@ public final class Register implements Serializable, Value {
 
     private static final String PREFIX_TEMPORARY = "%T";
 
+    private static String tmpPrefix = "";
     private static long counter = 0;
 
     private final String name;
 
+
     private Register(final String name) {
         this.name = name;
+    }
+
+    public static void setAdditionalTemporaryPrefix(final String prefix) {
+        tmpPrefix = prefix;
     }
 
     public static Register makeNamed(String name) {
@@ -21,7 +27,7 @@ public final class Register implements Serializable, Value {
     }
 
     public static Register makeTemporary() {
-        return new Register(PREFIX_TEMPORARY + counter++);
+        return new Register(PREFIX_TEMPORARY + tmpPrefix + counter++);
     }
 
     public static void resetCounter() {
