@@ -8,6 +8,8 @@ import com.ymcmp.okm.except.UndefinedOperationException;
 
 public final class StructType implements Type {
 
+    private static final long serialVersionUID = 912387547L;
+
     public final String name;
 
     private final boolean allocated;

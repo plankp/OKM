@@ -2,11 +2,16 @@ package com.ymcmp.okm;
 
 import java.util.Map;
 import java.util.List;
+import java.util.Arrays;
 import java.util.ArrayList;
 
 import java.util.logging.Level;
 
+import java.io.IOException;
+import java.io.ObjectOutputStream;
+
 import java.nio.file.Path;
+import java.nio.file.Files;
 import java.nio.file.Paths;
 
 import com.beust.jcommander.Parameter;
@@ -38,14 +43,17 @@ public class App {
         @Parameter(names={"--debug"}, description="Run compiler in debug mode")
         private boolean debug = false;
 
-        @Parameter(names={"--show-ir"}, description="Shows intermediate representation after compilation")
-        private boolean showIR = false;
-
         @Parameter(names={"--exec-ir"}, description="Executes intermediate representation after compilation")
         private boolean execIR = false;
 
-        @Parameter(names={"--to-amd64"}, description="Converts IR to x86-64 Intel syntax assembly (use with NASM)")
-        private boolean toAMD64 = false;
+        @Parameter(names={"--emit-ir"}, description="Outputs IR, cannot use with --emit-amd64")
+        private boolean emitIR = false;
+
+        @Parameter(names={"--emit-amd64"}, description="Converts IR to x86-64 Intel syntax assembly (use with NASM), cannot use with --emit-ir")
+        private boolean emitAMD64 = false;
+
+        @Parameter(names={"--output", "-o"}, description="Where to write the output to", converter=PathConverter.class)
+        private Path outputPath = null;
 
         @Parameter(names={"--help", "-h"}, description="Displays help")
         private boolean help = false;
@@ -117,16 +125,37 @@ public class App {
         });
         Register.resetCounter();
 
-        if (argData.showIR) {
-            final IRFormatter conv = new IRFormatter();
-            result.forEach(conv::convert);
-            System.out.println(conv.getResult());
+        if (argData.emitIR && argData.emitAMD64) {
+            throw new RuntimeException("--emit-ir cannot be used with --emit-amd64");
         }
 
-        if (argData.toAMD64) {
+        if (argData.emitIR) {
+            if (argData.outputPath == null) {
+                final IRFormatter conv = new IRFormatter();
+                result.forEach(conv::convert);
+                System.out.println(conv.getResult());
+            } else {
+                try (final ObjectOutputStream oos = new ObjectOutputStream(Files.newOutputStream(argData.outputPath))) {
+                    oos.writeObject(result);
+                } catch (IOException ex) {
+                    throw new RuntimeException("Cannot emit IR to " + argData.outputPath + ", " + ex.getMessage());
+                }
+            }
+        }
+
+        if (argData.emitAMD64) {
             final AMD64Converter conv = new AMD64Converter();
             result.forEach(conv::convert);
-            System.out.println(conv.getResult());
+            final String asm = conv.getResult();
+            if (argData.outputPath == null) {
+                System.out.println(asm);
+            } else {
+                try {
+                    Files.write(argData.outputPath, Arrays.asList(asm));
+                } catch (IOException ex) {
+                    throw new RuntimeException("Cannot emit AMD64 (NASM) to " + argData.outputPath + ", " + ex.getMessage());
+                }
+            }
         }
 
         if (argData.execIR) {

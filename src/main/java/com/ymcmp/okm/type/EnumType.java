@@ -6,6 +6,8 @@ import com.ymcmp.okm.except.DuplicateSymbolException;
 
 public final class EnumType implements Type {
 
+    private static final long serialVersionUID = 192375302L;
+
     private static final HashMap<String, String[]> KEYS = new HashMap<>();
 
     public final String name;

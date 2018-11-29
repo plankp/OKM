@@ -2,6 +2,8 @@ package com.ymcmp.okm.type;
 
 public final class Pointer implements Type {
 
+    private static final long serialVersionUID = 10293754L;
+
     public final Type inner;
 
     public Pointer(Type inner) {

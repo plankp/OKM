@@ -4,6 +4,8 @@ import java.util.Arrays;
 
 public final class FuncType implements Type {
 
+    private static final long serialVersionUID = 739173554511L;
+
     public Type ret;
     public Type[] params;
 

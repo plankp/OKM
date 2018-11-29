@@ -6,6 +6,8 @@ import com.ymcmp.okm.except.DuplicateSymbolException;
 
 public final class EnumKeyType implements Type {
 
+    private static final long serialVersionUID = 55021745L;
+
     private static final UnaryType TYPE_INT = UnaryType.getType("int");
 
     public final String name;

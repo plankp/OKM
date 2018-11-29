@@ -1,6 +1,8 @@
 package com.ymcmp.okm.type;
 
-public interface Type {
+import java.io.Serializable;
+
+public interface Type extends Serializable {
 
     public int getSize();
 

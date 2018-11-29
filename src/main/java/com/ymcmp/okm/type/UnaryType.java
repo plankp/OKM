@@ -5,6 +5,8 @@ import java.util.Objects;
 
 public final class UnaryType implements Type {
 
+    private static final long serialVersionUID = 19375477L;
+
     private static final HashMap<String, Integer> NUM_TYPE_DISTANCE = new HashMap<>();
     private static final HashMap<String, UnaryType> CACHE = new HashMap<>();
 
