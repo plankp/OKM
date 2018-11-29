@@ -79,6 +79,7 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
 
         OPT_PASSES.add(new ReduceMovePass());
         OPT_PASSES.add(new TailCallPass());
+        OPT_PASSES.add(new SquashCmpPass());
         OPT_PASSES.add(new ConstantFoldPass());
         OPT_PASSES.add(new EliminateDeadCodePass());
         OPT_PASSES.add(new TempParamPass());
