@@ -78,8 +78,8 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
         NUM_LIT_INFO.put('d', new Tuple<>("double", Double.SIZE));
 
         OPT_PASSES.add(new ReduceMovePass());
-        OPT_PASSES.add(new ConstantFoldPass());
         OPT_PASSES.add(new TailCallPass());
+        OPT_PASSES.add(new ConstantFoldPass());
         OPT_PASSES.add(new EliminateDeadCodePass());
         OPT_PASSES.add(new TempParamPass());
         OPT_PASSES.add(new ComSwapPass());
