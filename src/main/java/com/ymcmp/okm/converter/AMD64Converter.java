@@ -385,6 +385,24 @@ public class AMD64Converter implements Converter {
                     code.add("    jmp " + dst);
                     break;
                 }
+                case JUMP_INT_LT:
+                    intCmpJmp("jl", code, stmt, usedLabels);
+                    break;
+                case JUMP_INT_GT:
+                    intCmpJmp("jg", code, stmt, usedLabels);
+                    break;
+                case JUMP_INT_LE:
+                    intCmpJmp("jle", code, stmt, usedLabels);
+                    break;
+                case JUMP_INT_GE:
+                    intCmpJmp("jge", code, stmt, usedLabels);
+                    break;
+                case JUMP_INT_EQ:
+                    intCmpJmp("je", code, stmt, usedLabels);
+                    break;
+                case JUMP_INT_NE:
+                    intCmpJmp("jne", code, stmt, usedLabels);
+                    break;
                 case JUMP_IF_TRUE: {
                     // bool is 1 byte
                     final String dst = ".L" + ((Label) stmt.dst).getAddress();
@@ -1019,6 +1037,14 @@ public class AMD64Converter implements Converter {
             code.add("    mov sil, [rax + " + iter + "]");
             code.add("    mov [rbp - " + stackOffset + " + " + iter + "], sil");
         }
+    }
+
+    private void intCmpJmp(String op, List<String> code, Statement stmt, HashSet<String> usedLabels) {
+        final String dst = ".L" + ((Label) stmt.dst).getAddress();
+        usedLabels.add(dst);
+        code.add("    mov eax, " + getNumber(stmt.lhs));
+        code.add("    cmp eax, " + getNumber(stmt.rhs));
+        code.add("    " + op + " " + dst);
     }
 
     private static String getLeftData(String str) {

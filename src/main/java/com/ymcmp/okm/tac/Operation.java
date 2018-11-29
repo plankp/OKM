@@ -101,6 +101,13 @@ public enum Operation {
 
     GOTO,
 
+    JUMP_INT_LT,
+    JUMP_INT_GT,
+    JUMP_INT_LE,
+    JUMP_INT_GE,
+    JUMP_INT_EQ,
+    JUMP_INT_NE,
+
     JUMP_IF_TRUE,
     JUMP_IF_FALSE,
 
@@ -207,7 +214,7 @@ public enum Operation {
         }
     }
 
-    public boolean isCommutative() {
+    public Operation getCommutativePair() {
         switch (this) {
             case INT_ADD:
             case INT_MUL:
@@ -217,9 +224,30 @@ public enum Operation {
             case FLOAT_MUL:
             case DOUBLE_ADD:
             case DOUBLE_MUL:
-                return true;
+            case INT_EQ:
+            case INT_NE:
+            case JUMP_INT_EQ:
+            case JUMP_INT_NE:
+                // these opcodes are commutative themselves
+                return this;
+            case INT_LT:
+                return INT_GT;
+            case INT_GT:
+                return INT_LT;
+            case INT_LE:
+                return INT_GE;
+            case INT_GE:
+                return INT_LE;
+            case JUMP_INT_LT:
+                return JUMP_INT_GT;
+            case JUMP_INT_GT:
+                return JUMP_INT_LT;
+            case JUMP_INT_LE:
+                return JUMP_INT_GE;
+            case JUMP_INT_GE:
+                return JUMP_INT_LE;
             default:
-                return false;
+                return null;
         }
     }
 }

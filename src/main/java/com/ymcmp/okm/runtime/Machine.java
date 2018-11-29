@@ -342,6 +342,36 @@ public class Machine {
                     case GOTO:          //      dst:jumpsite
                         i = ((Label) stmt.dst).getAddress() - 1;    // -1 because loop invariant
                         break;
+                    case JUMP_INT_LT:   //      dst:jumpsite, lhs:a rhs:b
+                        if (toInt(fetchValue(stmt.lhs)) < toInt(fetchValue(stmt.rhs))) {
+                            i = ((Label) stmt.dst).getAddress() - 1;    // -1 because loop invariant
+                        }
+                        break;
+                    case JUMP_INT_GT:   //      dst:jumpsite, lhs:a rhs:b
+                        if (toInt(fetchValue(stmt.lhs)) > toInt(fetchValue(stmt.rhs))) {
+                            i = ((Label) stmt.dst).getAddress() - 1;    // -1 because loop invariant
+                        }
+                        break;
+                    case JUMP_INT_LE:   //      dst:jumpsite, lhs:a rhs:b
+                        if (toInt(fetchValue(stmt.lhs)) <= toInt(fetchValue(stmt.rhs))) {
+                            i = ((Label) stmt.dst).getAddress() - 1;    // -1 because loop invariant
+                        }
+                        break;
+                    case JUMP_INT_GE:   //      dst:jumpsite, lhs:a rhs:b
+                        if (toInt(fetchValue(stmt.lhs)) >= toInt(fetchValue(stmt.rhs))) {
+                            i = ((Label) stmt.dst).getAddress() - 1;    // -1 because loop invariant
+                        }
+                        break;
+                    case JUMP_INT_EQ:   //      dst:jumpsite, lhs:a rhs:b
+                        if (toInt(fetchValue(stmt.lhs)) == toInt(fetchValue(stmt.rhs))) {
+                            i = ((Label) stmt.dst).getAddress() - 1;    // -1 because loop invariant
+                        }
+                        break;
+                    case JUMP_INT_NE:   //      dst:jumpsite, lhs:a rhs:b
+                        if (toInt(fetchValue(stmt.lhs)) != toInt(fetchValue(stmt.rhs))) {
+                            i = ((Label) stmt.dst).getAddress() - 1;    // -1 because loop invariant
+                        }
+                        break;
                     case JUMP_IF_TRUE:  //      dst:jumpsite, lhs:value
                         if (toInt(fetchValue(stmt.lhs)) != 0) {
                             i = ((Label) stmt.dst).getAddress() - 1;    // -1 because loop invariant

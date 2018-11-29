@@ -20,12 +20,13 @@ public final class ComSwapPass implements Pass {
         Value lastDst = null;
         for (int i = 0; i < block.size(); ++i) {
             final Statement stmt = block.get(i);
-            if (stmt.op.isCommutative() && stmt.rhs.equals(lastDst)) {
+            final Operation commuPair = stmt.op.getCommutativePair();
+            if (commuPair != null && stmt.rhs.equals(lastDst)) {
                 // op1 -> a
                 // op2 -> b
                 // op3 a, b -> c
                 // If op3 is commutative, we swap a and b
-                final Statement reorg = new Statement(stmt.op, stmt.rhs, stmt.lhs, stmt.dst);
+                final Statement reorg = new Statement(commuPair, stmt.rhs, stmt.lhs, stmt.dst);
                 reorg.setDataSize(stmt.getDataSize());
                 block.set(i, reorg);
             }
