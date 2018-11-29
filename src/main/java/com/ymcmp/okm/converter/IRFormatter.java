@@ -18,7 +18,7 @@ public class IRFormatter implements Converter {
         final StringBuilder sb = new StringBuilder();
         final List<Statement> body = block.code;
 
-        sb.append("Function ").append(name).append(" :").append(block.signature).append('\n');
+        sb.append("Function ").append(name).append("\n- sigature: ").append(block.signature).append('\n');
         for (int i = 0; i < body.size(); ++i) {
             sb.append(String.format("%4d %s", i, body.get(i))).append('\n');
         }

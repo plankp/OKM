@@ -262,7 +262,7 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
                 MODULE_INITS.add(mangledName);
             }
 
-            RESULT.put(mangledName, new FuncBlock(currentModule.get(currentScope.functionName).type, funcStmts));
+            RESULT.put(mangledName, new FuncBlock((FuncType) currentModule.get(currentScope.functionName).type, funcStmts));
 
             // VALUE_STACK should be empty, but in case it isn't
             // functions have separate stack-frames. Clear them
