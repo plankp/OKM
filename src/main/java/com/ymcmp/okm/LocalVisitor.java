@@ -47,6 +47,7 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
     private static final UnaryType TYPE_LONG = UnaryType.getType("long");
     private static final UnaryType TYPE_FLOAT = UnaryType.getType("float");
     private static final UnaryType TYPE_DOUBLE = UnaryType.getType("double");
+    private static final UnaryType TYPE_UNIT = UnaryType.getType("unit");
 
     private static final Fixnum INT_ZERO = new Fixnum(0, Integer.SIZE);
 
@@ -94,7 +95,7 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
     private final Map<Path, Module> LOADED_MODULES = new HashMap<>();
     private final LinkedList<Value> VALUE_STACK = new LinkedList<>();
 
-    private final Map<String, List<Statement>> RESULT = new LinkedHashMap<>();
+    private final Map<String, FuncBlock> RESULT = new LinkedHashMap<>();
     private final List<String> MODULE_INITS = new ArrayList<>();
     private final List<Statement> PRE_INIT_STMTS = new ArrayList<>();
 
@@ -121,7 +122,7 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
         this.SEARCH_PATH = moduleSearchPath == null ? Arrays.asList() : moduleSearchPath;
     }
 
-    public Map<String, List<Statement>> compile(final List<Path> ps) {
+    public Map<String, FuncBlock> compile(final List<Path> ps) {
         RESULT.clear();
         ps.forEach(this::processModule);
 
@@ -136,7 +137,7 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
         }
         // Use RETURN_UNIT
         initializer.add(new Statement(Operation.RETURN_UNIT));
-        RESULT.put("@init", initializer);
+        RESULT.put("@init", new FuncBlock(new FuncType(TYPE_UNIT), initializer));
 
         Register.resetCounter();
 
@@ -224,7 +225,7 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
                 // next if block will be true If funcStmts does not end with a branch op
                 if (funcStmts.isEmpty() ? true : !funcStmts.get(funcStmts.size() - 1).op.branches()) {
                     // If the return type is unit, we will add it
-                    if (conformingType.isSameType(UnaryType.getType("unit"))) {
+                    if (conformingType.isSameType(TYPE_UNIT)) {
                         funcStmts.add(new Statement(Operation.RETURN_UNIT));
                     } else {
                         throw new RuntimeException("Function " + currentScope.functionName + " does not return!");
@@ -238,7 +239,7 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
                         final Label label = (Label) jmpOp.dst;
                         if (label.getAddress() >= funcStmts.size()) {
                             // If the return type is unit, we will add it
-                            if (conformingType.isSameType(UnaryType.getType("unit"))) {
+                            if (conformingType.isSameType(TYPE_UNIT)) {
                                 // Just in case for some reason the function ends at 10 and it jumps to 20
                                 label.setAddress(funcStmts.size());
                                 appendReturn = true;
@@ -261,7 +262,7 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
                 MODULE_INITS.add(mangledName);
             }
 
-            RESULT.put(mangledName, funcStmts);
+            RESULT.put(mangledName, new FuncBlock(currentModule.get(currentScope.functionName).type, funcStmts));
 
             // VALUE_STACK should be empty, but in case it isn't
             // functions have separate stack-frames. Clear them
@@ -559,13 +560,13 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
     }
 
     private void processReturn(Type maybeNull) {
-        final Type valueType = maybeNull == null ? UnaryType.getType("unit") : maybeNull;
+        final Type valueType = maybeNull == null ? TYPE_UNIT : maybeNull;
         if (!valueType.canConvertTo(conformingType)) {
             throw new IncompatibleTypeException(valueType, conformingType);
         }
 
         final Statement stmt;
-        if (valueType.isSameType(UnaryType.getType("unit"))) {
+        if (valueType.isSameType(TYPE_UNIT)) {
             stmt = new Statement(Operation.RETURN_UNIT);
         } else {
             final Value onStack = VALUE_STACK.pop();
@@ -844,7 +845,7 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
         }
         final Statement stmt;
         final Value temporary;
-        if (result.isSameType(UnaryType.getType("unit"))) {
+        if (result.isSameType(TYPE_UNIT)) {
             // if the function returns unit, we use CALL_UNIT instead
             // which does not use temporaries
             temporary = Fixnum.FALSE;   // really, any pure value will work
@@ -878,7 +879,7 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
         final Type b = (Type) visit(ctx.brFalse);
         final Value valB = VALUE_STACK.pop();;
         final Statement stmtB;
-        if (b.isSameType(UnaryType.getType("unit"))) {
+        if (b.isSameType(TYPE_UNIT)) {
             stmtB = new Statement(Operation.NOP);
             ++numOfUnitFuncs;
         } else {
@@ -895,7 +896,7 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
         final Type a = (Type) visit(ctx.brTrue);
         final Value valA = VALUE_STACK.pop();;
         final Statement stmtA;
-        if (a.isSameType(UnaryType.getType("unit"))) {
+        if (a.isSameType(TYPE_UNIT)) {
             stmtA = new Statement(Operation.NOP);
             ++numOfUnitFuncs;
         } else {
