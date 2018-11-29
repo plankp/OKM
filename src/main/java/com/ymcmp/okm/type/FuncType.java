@@ -29,7 +29,8 @@ public final class FuncType implements Type {
 
     @Override
     public String toString() {
-        return Arrays.toString(params) + " -> " + ret;
+        final String pstr = Arrays.toString(params);
+        return ret + "(" + pstr.substring(1, pstr.length() - 1) + ")";
     }
 
     @Override
