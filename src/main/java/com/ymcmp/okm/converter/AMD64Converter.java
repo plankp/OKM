@@ -617,15 +617,18 @@ public class AMD64Converter implements Converter {
                         if (data1.equals(data2)) {
                             // op1 [rbp + 12], a
                             // op2 b, [rbp + 12]
-                            // is transformed into op2 b, a
+                            // is transformed into op1 b, a
                             final String lhs = getLeftData(line2);
                             final String rhs = getRightData(line1);
+                            final String opc = getOpcode(line1);
+
+                            final String synth = opc + lhs + "," + rhs;
 
                             code.remove(i + 2);
                             if (lhs.equals(rhs)) {
                                 code.remove(i + 1);
                             } else {
-                                code.set(i + 1, getOpcode(line2) + lhs + "," + rhs);
+                                code.set(i + 1, synth);
                             }
 
                             code.remove(i);
@@ -911,7 +914,7 @@ public class AMD64Converter implements Converter {
     }
 
     private void loadBoolean(boolean value, List<String> code, Statement stmt) {
-        code.add("    mov " + getOrAllocSite(1, stmt.dst, code) + ", " + (value ? "1" : "0"));
+        code.add("    mov " + getOrAllocSite(1, stmt.dst, code) + ", BYTE " + (value ? "1" : "0"));
     }
 
     private void int2Float(boolean quad, List<String> code, Statement stmt) {
@@ -990,7 +993,7 @@ public class AMD64Converter implements Converter {
 
     private void alloca(int bytes, Value dst, List<String> code) {
         // Acquire a pointer to block of data
-        code.add("    lea rdi, [rbp - " + stackOffset + "]");
+        code.add("    lea rdi, [rbp - " + stackOffset + " + 0]");
         stackOffset += bytes;
 
         code.add("    mov " + getOrAllocSite(8, dst, code) + ", rdi");
