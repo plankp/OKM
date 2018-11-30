@@ -27,9 +27,16 @@ public final class Statement implements Serializable {
 
     public Statement(Operation op, Value lhs, Value rhs, Value dst) {
         this.op = op;
-        this.lhs = lhs;
-        this.rhs = rhs;
-        this.dst = dst;
+        this.lhs = safeUnwrapMutable(lhs);
+        this.rhs = safeUnwrapMutable(rhs);
+        this.dst = safeUnwrapMutable(dst);
+    }
+
+    private static Value safeUnwrapMutable(final Value val) {
+        if (val instanceof Mutable) {
+            return ((Mutable) val).getValue();
+        }
+        return val;
     }
 
     public void setDataSize(int size) {
