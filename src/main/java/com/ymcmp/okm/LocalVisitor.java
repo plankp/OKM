@@ -724,15 +724,31 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
         final Mutable mut = new MutableCell();
         VALUE_STACK.push(mut);
 
+        Type ftype = null;
+        String fsite = null;
         final List<Tuple<String, Type>> args = ctx.exprs == null ? Collections.EMPTY_LIST : visitFArgsList(ctx.exprs);
-        final String fname = Module.makeFuncName(base, args.stream().map(Tuple::getA).toArray(String[]::new));
-        final Type ftype = currentScope.get(fname);
+        if (args.isEmpty()) {
+            // unit transfer(block :unit()) = block()
+            // block actually refers to the parameter
+            // We should look at the currentScope before checking global level
+
+            final Type local = currentScope.get(base);
+            if (local != null && local.tryPerformCall() != null) {
+                fsite = base;
+                ftype = local;
+            }
+        }
+
         if (ftype == null) {
-            throw new UndefinedSymbolException(fname);
+            final String fname = Module.makeFuncName(base, args.stream().map(Tuple::getA).toArray(String[]::new));
+            if ((ftype = currentScope.get(fname)) == null) {
+                throw new UndefinedSymbolException(fname);
+            }
+            fsite = fname;
         }
 
         // Update function pointer here (it is resolved)
-        mut.setValue(Register.makeNamed(currentScope.getProcessedName(NAMING_STRAT, fname)));
+        mut.setValue(Register.makeNamed(currentScope.getProcessedName(NAMING_STRAT, fsite)));
 
         return performCall(ftype, args.stream().map(Tuple::getB).toArray(Type[]::new));
     }
