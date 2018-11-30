@@ -1517,8 +1517,9 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
     }
 
     @Override
-    public Type visitExprAllocStruct(ExprAllocStructContext ctx) {
-        final String structName = ctx.t.getText();
+    public Type visitExprAllocStruct(ExprAllocStructContext node) {
+        final FcallStmtContext ctx = node.info;
+        final String structName = ctx.base.getText();
         final Module.Entry ent = currentModule.get(structName);
         if (ent == null) {
             throw new UndefinedSymbolException(structName);
@@ -1529,6 +1530,28 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
             final Statement stmt = new Statement(Operation.ALLOC_STRUCT, temp);
             stmt.setDataSize(newData.getSize());
             funcStmts.add(stmt);
+
+            if (ctx.exprs != null) {
+                final FArgsListContext initList = ctx.exprs;
+                for (int i = 0; i < initList.getChildCount(); i += 2) {
+                    final FArgumentContext initPair = (FArgumentContext) initList.getChild(i);
+                    final String attrName = initPair.name.getText();
+                    final Type attrType = newData.tryAccessAttribute(attrName);
+                    if (attrType == null) {
+                        throw new UndefinedSymbolException(newData + " does not have attribute " + attrName);
+                    }
+
+                    final Type valueType = (Type) visit(initPair.value);
+                    if (!valueType.canConvertTo(attrType)) {
+                        throw new IncompatibleTypeException(valueType, attrType);
+                    }
+                    final Value converted = insertConversion(VALUE_STACK.pop(), valueType, attrType);
+                    final Statement mov = new Statement(Operation.PUT_ATTR, temp, new Fixnum(newData.getOffsetOfField(attrName)), converted);
+                    mov.setDataSize(valueType.getSize());
+                    funcStmts.add(mov);
+                }
+            }
+
             VALUE_STACK.push(temp);
             return newData;
         }

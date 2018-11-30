@@ -18,10 +18,7 @@ public struct Card (
 )
 
 Card new_card (suit :Suit, value :FaceValue) {
-    card := new Card
-    card.suit = suit
-    card.value = value
-    return card
+    return new Card(suit: suit, value: value)
 }
 
 # All things pass by value, structs included

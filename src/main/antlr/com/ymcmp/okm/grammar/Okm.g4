@@ -161,7 +161,7 @@ rcallStmt: base = expr tail = rcallTail;
 expr:
     NUMBER                                             # exprNumber
     | (TRUE | FALSE)                                   # exprBool
-    | NEW t = IDENT                                    # exprAllocStruct
+    | NEW info = fcallStmt                             # exprAllocStruct
     | base = expr tail = rcallTail                     # exprRefCall
     | fcallStmt                                        # exprFuncCall
     | symbolName                                       # exprSymbol
