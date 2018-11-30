@@ -99,6 +99,8 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
     private final List<String> MODULE_INITS = new ArrayList<>();
     private final List<Statement> PRE_INIT_STMTS = new ArrayList<>();
 
+    private long lambdaId = 0;
+
     private Path currentFile;
     private Module currentModule;
     private Visibility currentVisibility;
@@ -112,7 +114,7 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
     private Label currentLoopHead;
     private Label currentLoopEnd;
 
-    private List<Tuple<Scope, FunctionDeclContext>> pendingFunctions;
+    private List<Triple<Scope, FunctionBodyContext, Type>> pendingFunctions;
 
     public LocalVisitor() {
         this(Arrays.asList());
@@ -124,6 +126,7 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
 
     public Map<String, FuncBlock> compile(final List<Path> ps) {
         RESULT.clear();
+        lambdaId = 0;
         ps.forEach(this::processModule);
 
         // define a function called unit @init() { }
@@ -177,14 +180,15 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
     @Override
     public Object visitProgram(final ProgramContext ctx) {
         // Save
-        final List<Tuple<Scope, FunctionDeclContext>> oldPendingFunctions = pendingFunctions;
+        final List<Triple<Scope, FunctionBodyContext, Type>> oldPendingFunctions = pendingFunctions;
         pendingFunctions = new ArrayList<>();
 
         visitChildren(ctx);
 
         // Process functions after imported symbols are processed
-        for (final Tuple<Scope, FunctionDeclContext> funcInfo : pendingFunctions) {
-            final FunctionDeclContext fctx = funcInfo.getB();
+        for (int i = 0; i < pendingFunctions.size(); ++i) {
+            final Triple<Scope, FunctionBodyContext, Type> funcInfo = pendingFunctions.get(i);
+            final FunctionBodyContext fctx = funcInfo.getB();
 
             // This scope already contains the local parameters
             currentScope = funcInfo.getA();
@@ -195,7 +199,7 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
             }
 
             // Define the return type of the function
-            conformingType = visitType(fctx.ret);
+            conformingType = funcInfo.getC();
 
             // Allocate function statement buffer
             funcStmts = new ArrayList<>();
@@ -459,18 +463,33 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
 
     @Override
     public Object visitFunctionDecl(FunctionDeclContext ctx) {
-        final String base = ctx.base.getText();
-        final List<Tuple<String, Type>> params = ctx.params == null ? Collections.EMPTY_LIST : visitParamList(ctx.params);
+        makeFunction(currentVisibility, ctx.base.getText(), ctx.ret, ctx.params, ctx.body);
+        return null;
+    }
 
-        Type ret = visitType(ctx.ret);
+    @Override
+    public Type visitLambda(LambdaContext ctx) {
+        final Tuple<String, Type> pair = makeFunction(Visibility.PRIVATE, lambdaId++ + "_LAMBDA", ctx.ret, ctx.params, ctx.body);
+        final Register tmp = Register.makeTemporary();
+        final Statement stmt = new Statement(Operation.LOAD_FUNC, Register.makeNamed(currentScope.getProcessedName(NAMING_STRAT, pair.getA())), tmp);
+        funcStmts.add(stmt);
+        VALUE_STACK.push(tmp);
+        return pair.getB();
+    }
+
+    private Tuple<String, Type> makeFunction(Visibility vis, final String base, TypeContext retCtx, ParamListContext paramsCtx, FunctionBodyContext bodyCtx) {
+        final List<Tuple<String, Type>> params = paramsCtx == null ? Collections.EMPTY_LIST : visitParamList(paramsCtx);
+
+        Type ret = visitType(retCtx);
         if (ret instanceof StructType) {
             ret = ((StructType) ret).allocate();
         }
 
         final String name = Module.makeFuncName(base, params.stream().map(Tuple::getA).toArray(String[]::new));
         final Type[] paramType = params.stream().map(Tuple::getB).toArray(Type[]::new);
-        LOGGER.info("Declare " + currentVisibility + " function " + name);
-        currentModule.put(name, Module.Entry.newVariable(currentVisibility, new FuncType(ret, paramType), currentFile));
+        LOGGER.info("Declare " + vis + " function " + name);
+        final FuncType deducedType = new FuncType(ret, paramType);
+        currentModule.put(name, Module.Entry.newVariable(vis, deducedType, currentFile));
 
         // Construct the function scope since all the required info is already present
         final Scope funcBodyScope = new Scope(name, currentModule);
@@ -482,8 +501,8 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
         }
 
         // Process function body later
-        pendingFunctions.add(new Tuple<>(funcBodyScope, ctx));
-        return null;
+        pendingFunctions.add(new Triple<>(funcBodyScope, bodyCtx, ret));
+        return new Tuple<>(name, deducedType);
     }
 
     @Override
@@ -1464,7 +1483,7 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
         if (!(symType instanceof EnumType)) {
             final Register r = Register.makeNamed(currentScope.getProcessedName(NAMING_STRAT, symbol));
             if (symbol.charAt(symbol.length() - 1) == ':') {
-                // Functions use LOAD_FUNCTION
+                // Functions use LOAD_FUNC
                 final Register tmp = Register.makeTemporary();
                 final Statement stmt = new Statement(Operation.LOAD_FUNC, r, tmp);
                 funcStmts.add(stmt);

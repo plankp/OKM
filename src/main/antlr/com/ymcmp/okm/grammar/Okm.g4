@@ -121,12 +121,13 @@ type:
 
 parameter: (IDENT COMMA)* IDENT COLON t = type;
 paramList: (parameter COMMA)* parameter;
+functionBody:
+    bodyBlock = block
+    | SET bodyExpr = expr
+    | SET NATIVE nativeFFI = IDENT;
+
 functionDecl:
-    ret = type base = IDENT LPAREN params = paramList? RPAREN (
-        bodyBlock = block
-        | SET bodyExpr = expr
-        | SET NATIVE nativeFFI = IDENT
-    );
+    ret = type base = IDENT LPAREN params = paramList? RPAREN body = functionBody;
 
 variableDecl: p = parameter;
 
@@ -158,9 +159,13 @@ rArgsList: (expr COMMA)* expr;
 rcallTail: LPAREN exprs = rArgsList? RPAREN;
 rcallStmt: base = expr tail = rcallTail;
 
+lambda:
+    ret = type LPAREN params = paramList? RPAREN body = functionBody;
+
 expr:
     NUMBER                                             # exprNumber
     | (TRUE | FALSE)                                   # exprBool
+    | lambda                                           # exprLambda
     | NEW info = fcallStmt                             # exprAllocStruct
     | base = expr tail = rcallTail                     # exprRefCall
     | fcallStmt                                        # exprFuncCall
