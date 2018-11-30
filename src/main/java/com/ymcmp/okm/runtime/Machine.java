@@ -417,7 +417,7 @@ public class Machine {
                         execute(code, fetchValue(stmt.dst).toString());
                         break;
                     case TAILCALL: {    //      dst:callsite
-                        func = code.get(stmt.dst.toString());
+                        func = code.get(fetchValue(stmt.dst).toString());
                         i = -1; // invariant ++i will set it to zero
                         continue;
                     }
