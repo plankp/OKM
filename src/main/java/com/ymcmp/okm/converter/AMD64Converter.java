@@ -503,12 +503,23 @@ public class AMD64Converter implements Converter {
                     pushIntParam = pushFloatParam = 0;
                     code.add("    call " + getNumber(stmt.dst));
                     break;
-                case TAILCALL:
+                case TAILCALL: {
                     pushIntParam = pushFloatParam = 0;
-                    generateFuncEpilogue(code);
-                    code.add("    ;;@ tailcall");
-                    code.add("    jmp " + getNumber(stmt.dst));
+                    final String offset = getNumber(stmt.dst);
+                    if (offset.startsWith("[rbp - ")) {
+                        // callsite is on stack, but since epilogue changes the
+                        // rbp and possibly rsp, we save the value to rax first
+                        code.add("    mov rax, " + offset);
+                        generateFuncEpilogue(code);
+                        code.add("    ;;@ tailcall");
+                        code.add("    jmp rax");
+                    } else {
+                        generateFuncEpilogue(code);
+                        code.add("    ;;@ tailcall");
+                        code.add("    jmp " + offset);
+                    }
                     break;
+                }
                 case PUSH_PARAM_INT: {
                     final int bs = stmt.getDataSize() / 8;
                     if (pushIntParam < 6) {
