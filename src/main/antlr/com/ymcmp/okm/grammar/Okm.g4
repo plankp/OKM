@@ -108,6 +108,7 @@ block: LBRACKET body += stmts* RBRACKET;
 type:
     AMP inner = type
     | ret = type LPAREN (type (',' type)*)? RPAREN
+    | STRUCT LPAREN list = structList? RPAREN
     | BYTE
     | CHAR
     | SHORT

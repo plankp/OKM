@@ -421,6 +421,7 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
         if (ctx.inner != null) {
             return new Pointer(visitType(ctx.inner));
         }
+
         if (ctx.ret != null) {
             final Type ret = visitType(ctx.ret);
             final Type[] params = new Type[ctx.getChildCount() / 2 - 1];
@@ -428,6 +429,10 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
                 params[i] = visitType((TypeContext) ctx.getChild((i + 1) * 2));
             }
             return new FuncType(ret, params);
+        }
+
+        if (ctx.list != null) {
+            return makeStruct(ctx.list);
         }
 
         final String name = ctx.getText();
@@ -575,16 +580,23 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
     @Override
     public Object visitStructDecl(StructDeclContext ctx) {
         final String name = ctx.name.getText();
-        final StructType type = new StructType();
-        this.currentStruct = type;
-        if (ctx.list != null) {
-            visit(ctx.list);
-        }
+        final StructType type = makeStruct(ctx.list);
         LOGGER.info("Declare " + currentVisibility + " " + type);
         final Module.Entry entry = Module.Entry.newType(currentVisibility, type, currentFile);
         currentModule.put(name, entry);
-        this.currentStruct = null;
         return null;
+    }
+
+    private StructType makeStruct(StructListContext list) {
+        final StructType old = this.currentStruct;
+
+        final StructType type = new StructType();
+        this.currentStruct = type;
+        if (list != null) {
+            visit(list);
+        }
+        this.currentStruct = old;
+        return type;
     }
 
     private void processReturn(Type maybeNull) {
