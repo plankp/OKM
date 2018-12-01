@@ -3,6 +3,8 @@ package com.ymcmp.okm.type;
 import java.util.Map;
 import java.util.LinkedHashMap;
 
+import java.util.stream.Collectors;
+
 import com.ymcmp.okm.except.DuplicateSymbolException;
 import com.ymcmp.okm.except.UndefinedOperationException;
 
@@ -88,6 +90,8 @@ public final class StructType implements Type {
 
     @Override
     public String toString() {
-        return (allocated ? "allocated " : "") + "struct " + name;
+        return fields.entrySet().stream()
+                .map(e -> e.getKey() + " :" + e.getValue())
+                .collect(Collectors.joining(", ", "struct(", ")"));
     }
 }
