@@ -109,7 +109,7 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
     private Type conformingType;
     private List<Statement> funcStmts;
 
-    private StructType currentStruct;
+    private AllocTable currentAllocTable;
 
     private Label currentLoopHead;
     private Label currentLoopEnd;
@@ -432,7 +432,9 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
         }
 
         if (ctx.list != null) {
-            return makeStruct(ctx.list);
+            final StructType type = new StructType();
+            makeStruct(type, ctx.list);
+            return type;
         }
 
         final String name = ctx.getText();
@@ -486,8 +488,8 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
         final List<Tuple<String, Type>> params = paramsCtx == null ? Collections.EMPTY_LIST : visitParamList(paramsCtx);
 
         Type ret = visitType(retCtx);
-        if (ret instanceof StructType) {
-            ret = ((StructType) ret).allocate();
+        if (ret instanceof AllocTable) {
+            ret = ((AllocTable) ret).allocate();
         }
 
         final String name = Module.makeFuncName(base, params.stream().map(Tuple::getA).toArray(String[]::new));
@@ -544,10 +546,10 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
                 // This is a local variable
                 LOGGER.info("Declare local variable " + newVar.getA() + " as type " + newVar.getB());
                 currentScope.put(newVar.getA(), newVar.getB());
-            } else if (currentStruct != null) {
+            } else if (currentAllocTable != null) {
                 // This is part of a struct
-                LOGGER.info("Declare " + currentStruct + " field " + newVar.getA() + " as type " + newVar.getB());
-                currentStruct.putField(newVar.getA(), newVar.getB());
+                LOGGER.info("Declare class/struct field " + newVar.getA() + " as type " + newVar.getB());
+                currentAllocTable.putField(newVar.getA(), newVar.getB());
             } else {
                 // This is a module level variable
                 LOGGER.info("Declare " + currentVisibility + " variable " + newVar.getA() + " as type " + newVar.getB());
@@ -580,23 +582,32 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
     @Override
     public Object visitStructDecl(StructDeclContext ctx) {
         final String name = ctx.name.getText();
-        final StructType type = makeStruct(ctx.list);
+        final StructType type = new StructType();
+        makeStruct(type, ctx.list);
         LOGGER.info("Declare " + currentVisibility + " " + type);
         final Module.Entry entry = Module.Entry.newType(currentVisibility, type, currentFile);
         currentModule.put(name, entry);
         return null;
     }
 
-    private StructType makeStruct(StructListContext list) {
-        final StructType old = this.currentStruct;
+    @Override
+    public Object visitClassDecl(ClassDeclContext ctx) {
+        final String name = ctx.name.getText();
+        final ClassType type = new ClassType(name);
+        makeStruct(type, ctx.list);
+        final Module.Entry entry = Module.Entry.newType(currentVisibility, type, currentFile);
+        currentModule.put(name, entry);
+        return null;
+    }
 
-        final StructType type = new StructType();
-        this.currentStruct = type;
+    private <T extends AllocTable & Type> void makeStruct(T type, StructListContext list) {
+        final AllocTable old = this.currentAllocTable;
+
+        this.currentAllocTable = type;
         if (list != null) {
             visit(list);
         }
-        this.currentStruct = old;
-        return type;
+        this.currentAllocTable = old;
     }
 
     private void processReturn(Type maybeNull) {
@@ -1402,7 +1413,7 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
             stmt = new Statement(
                     isPointer ? Operation.DEREF_GET_ATTR : Operation.GET_ATTR,
                     VALUE_STACK.pop(),
-                    new Fixnum(((StructType) coreType).getOffsetOfField(attr)),
+                    new Fixnum(((AllocTable) coreType).getOffsetOfField(attr)),
                     temporary);
         }
         stmt.setDataSize(result.getSize());
@@ -1571,8 +1582,8 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
         if (ent == null) {
             throw new UndefinedSymbolException(structName);
         }
-        if (ent.isType && ent.type instanceof StructType) {
-            final StructType newData = ((StructType) ent.type).allocate();
+        if (ent.isType && ent.type instanceof AllocTable) {
+            final AllocTable newData = ((AllocTable) ent.type).allocate();
             final Register temp = Register.makeTemporary();
             final Statement stmt = new Statement(Operation.ALLOC_STRUCT, temp);
             stmt.setDataSize(newData.getSize());
@@ -1602,7 +1613,7 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
             VALUE_STACK.push(temp);
             return newData;
         }
-        throw new UndefinedOperationException("Cannot allocate non-struct type " + structName);
+        throw new UndefinedOperationException("Cannot allocate non-class/struct type " + structName);
     }
 
     @Override

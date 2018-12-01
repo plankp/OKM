@@ -27,6 +27,7 @@ BOOL: 'bool';
 
 ENUM: 'enum';
 STRUCT: 'struct';
+CLASS: 'class';
 
 RETURN: 'return';
 BREAK: 'break';
@@ -78,6 +79,7 @@ decls:
         | variableDecl
         | enumDecl
         | structDecl
+        | classDecl
     );
 
 symbolName:
@@ -135,6 +137,14 @@ variableDecl: p = parameter;
 structList: (variableDecl COMMA)* variableDecl;
 structDecl:
     STRUCT name = IDENT LPAREN list = structList? RPAREN;
+
+
+methodDecl:
+    empty = SEMI
+    | ret = type base = IDENT LPAREN selfPtr = IDENT (COMMA params = paramList)? RPAREN body = functionBody;
+classDecl:
+    CLASS name = IDENT LPAREN list = structList? RPAREN
+    LBRACKET fields = methodDecl* RBRACKET;
 
 enumList: (IDENT COMMA)* IDENT;
 enumDecl: ENUM name = IDENT LPAREN list = enumList? RPAREN;
