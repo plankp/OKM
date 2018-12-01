@@ -356,9 +356,15 @@ public class AMD64Converter implements Converter {
                 case LOAD_NUMERAL:
                 case STORE_VAR: {
                     final int bs = stmt.getDataSize() / 8;
-                    final String tmp = getIntRegister(bs);
-                    code.add("    mov " + tmp + ", " + getNumber(stmt.lhs));
-                    code.add("    mov " + getOrAllocSite(bs, stmt.dst, code) + ", " + tmp);
+                    if (bs > 8) {
+                        code.add("    lea rax, " + getNumber(stmt.lhs));
+                        alloca(bs, stmt.dst, code);
+                        memcpyRaxToStack(bs, code);
+                    } else {
+                        final String tmp = getIntRegister(bs);
+                        code.add("    mov " + tmp + ", " + getNumber(stmt.lhs));
+                        code.add("    mov " + getOrAllocSite(bs, stmt.dst, code) + ", " + tmp);
+                    }
                     break;
                 }
                 case LOAD_FUNC:
