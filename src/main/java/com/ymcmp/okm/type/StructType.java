@@ -1,6 +1,7 @@
 package com.ymcmp.okm.type;
 
 import java.util.Map;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 
 import java.util.stream.Collectors;
@@ -12,17 +13,14 @@ public final class StructType implements Type {
 
     private static final long serialVersionUID = 912387547L;
 
-    public final String name;
-
     private final boolean allocated;
     private final LinkedHashMap<String, Type> fields;
 
-    public StructType(String name) {
-        this(name, new LinkedHashMap<>(), false);
+    public StructType() {
+        this(new LinkedHashMap<>(), false);
     }
 
-    private StructType(String name, LinkedHashMap<String, Type> fields, boolean allocate) {
-        this.name = name;
+    private StructType(LinkedHashMap<String, Type> fields, boolean allocate) {
         this.fields = fields;
         this.allocated = allocate;
     }
@@ -30,9 +28,9 @@ public final class StructType implements Type {
     @Override
     public StructType allocate() {
         if (allocated) {
-            throw new UndefinedOperationException("Cannot allocate non-struct type " + name);
+            throw new UndefinedOperationException("Cannot allocate non-struct type");
         }
-        return new StructType(name, fields, true);
+        return new StructType(fields, true);
     }
 
     @Override
@@ -52,7 +50,14 @@ public final class StructType implements Type {
     @Override
     public boolean isSameType(Type t) {
         if (t instanceof StructType) {
-            return name.equals(((StructType) t).name);
+            // These two types are equivalent:
+            //   struct Color4f(r, b, g, a :float)
+            //   struct Vector4f(w, x, y, z :float)
+
+            final StructType other = (StructType) t;
+            final Type[] expect = this.fields.values().toArray(new Type[0]);
+            final Type[] actual = other.fields.values().toArray(new Type[0]);
+            return Arrays.equals(expect, actual);
         }
         return false;
     }

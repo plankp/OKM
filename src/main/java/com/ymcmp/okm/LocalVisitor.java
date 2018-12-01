@@ -575,7 +575,7 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
     @Override
     public Object visitStructDecl(StructDeclContext ctx) {
         final String name = ctx.name.getText();
-        final StructType type = new StructType(name);
+        final StructType type = new StructType();
         this.currentStruct = type;
         if (ctx.list != null) {
             visit(ctx.list);
