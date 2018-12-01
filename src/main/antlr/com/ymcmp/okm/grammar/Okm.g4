@@ -144,7 +144,7 @@ methodDecl:
     | ret = type base = IDENT LPAREN selfPtr = IDENT (COMMA params = paramList)? RPAREN body = functionBody;
 classDecl:
     CLASS name = IDENT LPAREN list = structList? RPAREN
-    LBRACKET fields = methodDecl* RBRACKET;
+    LBRACKET fields += methodDecl* RBRACKET;
 
 enumList: (IDENT COMMA)* IDENT;
 enumDecl: ENUM name = IDENT LPAREN list = enumList? RPAREN;

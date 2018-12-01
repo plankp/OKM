@@ -1,12 +1,12 @@
 package com.ymcmp.okm.type;
 
-public final class Pointer implements Type {
+public final class Pointer<T extends Type> implements Type {
 
     private static final long serialVersionUID = 10293754L;
 
-    public final Type inner;
+    public final T inner;
 
-    public Pointer(Type inner) {
+    public Pointer(T inner) {
         this.inner = inner;
     }
 

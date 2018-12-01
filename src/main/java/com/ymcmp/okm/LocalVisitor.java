@@ -460,8 +460,8 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
     }
 
     @Override
-    public List<Tuple<String, Type>> visitParamList(ParamListContext ctx) {
-        final List<Tuple<String, Type>> list = new ArrayList<>();
+    public List<Tuple<String, ? extends Type>> visitParamList(ParamListContext ctx) {
+        final List<Tuple<String, ? extends Type>> list = new ArrayList<>();
         for (int i = 0; i < ctx.getChildCount(); i += 2) {
             list.addAll((List<Tuple<String, Type>>) visit(ctx.getChild(i)));
         }
@@ -485,7 +485,15 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
     }
 
     private Tuple<String, Type> makeFunction(Visibility vis, final String base, TypeContext retCtx, ParamListContext paramsCtx, FunctionBodyContext bodyCtx) {
-        final List<Tuple<String, Type>> params = paramsCtx == null ? Collections.EMPTY_LIST : visitParamList(paramsCtx);
+        return makeMethod(vis, base, retCtx, paramsCtx, bodyCtx, new Tuple<>());
+    }
+
+    private Tuple<String, Type> makeMethod(Visibility vis, final String base, TypeContext retCtx, ParamListContext paramsCtx, FunctionBodyContext bodyCtx, Tuple<String, Pointer<ClassType>> self) {
+        final List<Tuple<String, ? extends Type>> params = paramsCtx == null ? new ArrayList<>() : visitParamList(paramsCtx);
+        if (!self.isEmpty()) {
+            // There is an additional `this` pointer as first parameter
+            params.add(0, self);
+        }
 
         Type ret = visitType(retCtx);
         if (ret instanceof AllocTable) {
@@ -503,7 +511,7 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
         funcBodyScope.shift();
 
         // Add function parameters info scope
-        for (final Tuple<String, Type> param : params) {
+        for (final Tuple<String,? extends Type> param : params) {
             funcBodyScope.put(param.getA(), param.getB());
         }
 
@@ -591,12 +599,28 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
     }
 
     @Override
-    public Object visitClassDecl(ClassDeclContext ctx) {
+    public Object visitClassDecl(final ClassDeclContext ctx) {
         final String name = ctx.name.getText();
         final ClassType type = new ClassType(name);
         makeStruct(type, ctx.list);
+        LOGGER.info("Declare " + currentVisibility + " " + type);
         final Module.Entry entry = Module.Entry.newType(currentVisibility, type, currentFile);
         currentModule.put(name, entry);
+
+        final long uniqueId = lambdaId++;
+        for (final MethodDeclContext method : ctx.fields) {
+            if (method.empty != null) {
+                // Ignore semicolons which are like non-strict separators
+                continue;
+            }
+
+            // Methods are functions with `this` pointer as additional first parameter
+            final String methodName = method.base.getText();
+            final Tuple<String, Type> pair = makeMethod(Visibility.PRIVATE,
+                    uniqueId + "_METHOD_" + name + "_" + methodName,
+                    method.ret, method.params, method.body,
+                    new Tuple<>(method.selfPtr.getText(), new Pointer<>(type.allocate())));
+        }
         return null;
     }
 
