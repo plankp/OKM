@@ -39,6 +39,16 @@ public final class EnumType implements Type {
         return KEYS.get(name);
     }
 
+    public int getOrdinalFor(final String key) {
+        final String[] keys = getKeys();
+        for (int i = 0; i < keys.length; ++i) {
+            if (keys[i].equals(key)) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
     public EnumKeyType createCorrespondingKey() {
         return new EnumKeyType(name);
     }
