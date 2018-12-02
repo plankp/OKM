@@ -74,6 +74,7 @@ public class App {
         OPT_PASSES.add(new SquashCmpPass());
         OPT_PASSES.add(new ConstantFoldPass());
         OPT_PASSES.add(new EliminateDeadCodePass());
+        OPT_PASSES.add(new NormalizeRefGetPass());
         OPT_PASSES.add(new TempParamPass());
         OPT_PASSES.add(new ComSwapPass());
     }
