@@ -389,10 +389,16 @@ public class AMD64Converter implements Converter {
                 }
                 case POINTER_GET: {
                     final int bs = stmt.getDataSize() / 8;
-                    final String tmp = getIntRegister(bs);
                     code.add("    mov rax, " + getNumber(stmt.lhs));
-                    code.add("    mov " + tmp + ", [rax]");
-                    code.add("    mov " + getOrAllocSite(bs, stmt.dst, code) + ", " + tmp);
+                    if (bs > 8) {
+                        // data will not fit under a register, do alloca then memcpy
+                        alloca(bs, stmt.dst, code);
+                        memcpyRaxToStack(bs, code);
+                    } else {
+                        final String tmp = getIntRegister(bs);
+                        code.add("    mov " + tmp + ", [rax]");
+                        code.add("    mov " + getOrAllocSite(bs, stmt.dst, code) + ", " + tmp);
+                    }
                     break;
                 }
                 case POINTER_PUT: {
