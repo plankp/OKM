@@ -43,8 +43,6 @@ public final class TempParamPass implements Pass {
             }
         }
 
-        // If we introduce the idea of a null register, the output code
-        // could be even more efficient (space-wise)
         for (final Map.Entry<Value, ArrayList<Integer>> pair : affectedOffsets.entrySet()) {
             final ArrayList<Integer> offsets = pair.getValue();
             switch (offsets.size()) {
