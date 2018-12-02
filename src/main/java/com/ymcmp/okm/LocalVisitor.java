@@ -1420,7 +1420,21 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
         //   struct HasFunc(fptr :unit(unit))
         //   ptr := new HasFunc(fptr :func)
         //   ptr.fptr()
-        final Type t = (Type) visit(obj);
+
+        Type t = (Type) visit(obj);
+        while (t instanceof Pointer) {
+            // Unwrap it!
+            t = ((Pointer) t).inner;
+
+            final Value ptr = VALUE_STACK.pop();
+            final Register tmp = Register.makeTemporary();
+            final Statement deref = new Statement(Operation.POINTER_GET, ptr, tmp);
+            deref.setDataSize(t.getSize());
+            funcStmts.add(deref);
+
+            VALUE_STACK.push(tmp);
+        }
+
         final Value objValue = VALUE_STACK.pop();
 
         // Function pointer must go before its arguments
@@ -1434,9 +1448,6 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
         funcStmts.add(ldObjPtr);
         VALUE_STACK.push(ptrToObj);
 
-        // TODO: Just like visitExprAccess, need to unwrap the pointer:
-        //   ptr_to_class :&&FooContainer
-        //   ptr_to_class.invokeMethod(bar: 10)
         if (t instanceof ClassType) {
             final ClassType base = (ClassType) t;
             final List<Tuple<String, Type>> args = sel.exprs == null ? Collections.EMPTY_LIST : visitFArgsList(sel.exprs);
