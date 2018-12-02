@@ -90,7 +90,8 @@ public enum Operation {
     DEREF_GET_ATTR,
     DEREF_PUT_ATTR,
 
-    ALLOC_STRUCT,
+    ALLOC_LOCAL,
+    ALLOC_GLOBAL,
 
     GET_ATTR,
     PUT_ATTR,

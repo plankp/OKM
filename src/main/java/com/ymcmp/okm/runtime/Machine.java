@@ -331,9 +331,17 @@ public class Machine {
                     case DEREF_PUT_ATTR: //     dst:value, lhs:pointer to struct, rhs:attr
                         ((StructFields) ((Mutable) fetchValue(stmt.lhs)).getValue()).put(stmt.rhs.toString(), fetchValue(stmt.dst));
                         break;
-                    case ALLOC_STRUCT:  //      dst:store, lhs:size of struct (we ignore this)
+                    case ALLOC_LOCAL:   //      dst:store, lhs:size of struct (we ignore this)
                         locals.put(stmt.dst, new StructFields());
                         break;
+                    case ALLOC_GLOBAL: { //     dst:store, lhs:data, rhs:attr
+                        StructFields fields = (StructFields) locals.get(stmt.dst);
+                        if (fields == null) {
+                            locals.put(stmt.dst, (fields = new StructFields()));
+                        }
+                        fields.put(stmt.rhs.toString(), fetchValue(stmt.lhs));
+                        break;
+                    }
                     case GET_ATTR:      //      dst:store, lhs:struct, rhs:attr
                         locals.put(stmt.dst, ((StructFields) fetchValue(stmt.lhs)).get(stmt.rhs.toString()));
                         break;

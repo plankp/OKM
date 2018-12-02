@@ -4,6 +4,7 @@ import java.util.Map;
 import java.util.List;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Arrays;
 import java.util.ArrayList;
 
 import java.util.stream.Stream;
@@ -34,7 +35,7 @@ public class AMD64Converter implements Converter {
     private final static String MARKER_EPILOGUE = "    ;;@ epilogue";
     private final static String MARKER_DST_TEMP = "    ;;@ dst_temp";
 
-    private final Map<Fixnum, DataValue> sectData = new HashMap<>();
+    private final Map<Value, DataValue> sectData = new HashMap<>();
     private final Map<String, String> sectBss = new HashMap<>();
     private final List<String> sectText = new ArrayList<>();
 
@@ -61,9 +62,9 @@ public class AMD64Converter implements Converter {
                 .collect(Collectors.joining("\n", "%ifidn __OUTPUT_FORMAT__, elf64\n", "\n%endif\n"));
         final String data = sectData.values().stream()
                 .map(DataValue::output)
-                .collect(Collectors.joining("\n", SECTION_DATA_HEADER, ""));
+                .collect(Collectors.joining("\n", SECTION_DATA_HEADER, "\n"));
         final String bss = sectBss.values().stream()
-                .collect(Collectors.joining("\n", SECTION_BSS_HEADER, ""));
+                .collect(Collectors.joining("\n", SECTION_BSS_HEADER, "\n"));
         final String text = sectText.stream()
                 .collect(Collectors.joining("\n", SECTION_TEXT_HEADER, ""));
         return namedef + '\n' + data + '\n' + bss + '\n' + text;
@@ -567,10 +568,30 @@ public class AMD64Converter implements Converter {
                     ++pushFloatParam;
                     break;
                 }
-                case ALLOC_STRUCT:
+                case ALLOC_LOCAL:
                     // Acquire a pointer to the start of the struct
                     alloca(stmt.getDataSize() / 8, stmt.dst, code);
                     break;
+                case ALLOC_GLOBAL: {
+                    final Value key = stmt.dst;
+                    final String value = toDataSizeString(stmt.getDataSize() / 8) + " " + getNumber(stmt.lhs);
+                    if (sectData.containsKey(key)) {
+                        sectData.get(key).value.add(value);
+                    } else {
+                        final String mangled = mangleName(key.toString());
+                        sectData.put(key, new DataValue(mangled, value));
+
+                        // Remove it from sectBss if it is declared as extern!
+                        final String handle = key.toString();
+                        if (sectBss.get(handle).startsWith("    extern ")) {
+                            globalNames.remove(mangled);
+                            sectBss.remove(handle);
+                        } else {
+                            dataMapping.put(key, String.format("[rel %s]", mangled));
+                        }
+                    }
+                    break;
+                }
                 case PUT_ATTR: {
                     // dst is the value being dumped into the struct
                     // lhs is the pointer of the struct
@@ -1116,14 +1137,15 @@ public class AMD64Converter implements Converter {
 final class DataValue {
 
     public final String label;
-    public final String value;
+    public final List<String> value;
 
     public DataValue(String label, String value) {
         this.label = label;
-        this.value = value;
+        this.value = new ArrayList<>(Arrays.asList(value));
     }
 
     public String output() {
-        return label + ":\n    " + value;
+        return value.stream()
+                .collect(Collectors.joining("\n    ", label + ":\n    ", ""));
     }
 }
