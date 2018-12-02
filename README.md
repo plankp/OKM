@@ -4,9 +4,9 @@ A programming language that has a builtin crappy optimizer!
 
 Apart from that, it has modules which are like static classes.
 
-Currently, it lacks a lot of usual stuff such as strings, arrays, classes / closures.
+Currently, it lacks a lot of usual stuff such as strings, arrays, closures.
 
-There are structs though, and I plan to make them kind of like classes as well!
+There are structs and classes though!
 
 The sample code runner is also very slow. Tail calls are optimized however,
 so it will not blow the stack if you write your returns properly.
@@ -34,7 +34,7 @@ The assembly code uses an ABI similar to System V AMD64.
 The following is tested on Mac OS with clang and on Debian linux with gcc:
 
 If you add the appropriate `global` directives in the output assembly,
-you can call them from C. *Structs require extra care (see below)*
+you can call them from C. *Structs and classes require extra care (see below)*
 
 For structs, if they fit under a long (64 bits),
 if they just contain integer types, they should work directly.
@@ -69,4 +69,30 @@ void foo(void) {
     // Stack allocated, no need to call free
     Vector3f v = *F17_M0_from_origin_f_x_y_z_(1.2, 5.2, 0.9);
 }
+```
+
+Classes are structs with a virtual method table tacked on the end.
+Given a class like the following:
+
+```
+class ExprInt(op :int, lhs, rhs :int) {
+    int compute(self) =
+        if self.op == 0       self.lhs + selfrhs
+        else if self.op == 1  self.lhs - selfrhs
+        else if self.op == 2  self.lhs * selfrhs
+        else                  self.lhs / selfrhs
+}
+```
+
+The equivalent in C will be (notice the pointer to the data):
+
+```C
+typedef struct ExprInt {
+    int op;
+    int lhs, rhs;
+
+    struct {
+        int (*compute)(struct ExprInt *const self);
+    } *vtable;
+} ExprInt;
 ```
