@@ -182,8 +182,6 @@ public enum Operation {
     public boolean hasPotentialSideEffects() {
         switch (this) {
             case STORE_VAR:
-            case REFER_VAR:
-            case REFER_ATTR:
             case POINTER_PUT:
             case DEREF_PUT_ATTR:
             case PUSH_PARAM_INT:
