@@ -139,7 +139,6 @@ structList: (variableDecl COMMA)* variableDecl;
 structDecl:
     STRUCT name = IDENT LPAREN list = structList? RPAREN;
 
-
 methodDecl:
     empty = SEMI
     | ret = type selfPtr = IDENT DOT base = IDENT LPAREN params = paramList? RPAREN body = functionBody;
