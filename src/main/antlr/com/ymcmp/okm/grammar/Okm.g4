@@ -142,7 +142,7 @@ structDecl:
 
 methodDecl:
     empty = SEMI
-    | ret = type base = IDENT LPAREN selfPtr = IDENT (COMMA params = paramList)? RPAREN body = functionBody;
+    | ret = type selfPtr = IDENT DOT base = IDENT LPAREN params = paramList? RPAREN body = functionBody;
 classDecl:
     CLASS name = IDENT LPAREN list = structList? RPAREN
     LBRACKET fields += methodDecl* RBRACKET;
