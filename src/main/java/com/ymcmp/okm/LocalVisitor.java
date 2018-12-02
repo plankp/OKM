@@ -1351,56 +1351,49 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
         final Type base = (Type) visit(ctx.base);
         Type coreType = base;
 
-        boolean isPointer = false;
         Type result = base.tryAccessAttribute(attr);
         if (result == null) {
-            // It might be a pointer. in which case we un-pointer it
-            // and see it it works
-            Value ptr = null;
-            block: {
-                if (base instanceof Pointer) {
-                    isPointer = true;
-                    ptr = VALUE_STACK.pop();
-                    Type newBase = base;
-                    while (newBase instanceof Pointer) {
-                        newBase = ((Pointer) newBase).inner;
-                        if ((result = newBase.tryAccessAttribute(attr)) != null) {
-                            coreType = newBase;
-                            break block;
-                        }
-
-                        final Register temp = Register.makeTemporary();
-                        final Statement deref = new Statement(Operation.POINTER_GET, ptr, temp);
-                        deref.setDataSize(newBase.getSize());
-                        funcStmts.add(deref);
-                        ptr = temp;
-                    }
-                    throw new UndefinedOperationException("Type " + newBase + " does not allow accessing attribute " + attr);
+            // It might be a pointer, in which case dereference it
+            // and see if it works
+            while (coreType instanceof Pointer) {
+                coreType = ((Pointer) coreType).inner;
+                result = coreType.tryAccessAttribute(attr);
+                if (result != null) {
+                    // Found the type that works, in that case,
+                    // do not dereference the pointer any further
+                    break;
                 }
-                throw new UndefinedOperationException("Type " + base + " does not allow accessing attribute " + attr);
+
+                final Value ptr = VALUE_STACK.pop();
+                final Register tmp = Register.makeTemporary();
+                final Statement deref = new Statement(Operation.POINTER_GET, ptr, tmp);
+                deref.setDataSize(coreType.getSize());
+                funcStmts.add(deref);
+
+                VALUE_STACK.push(tmp);
             }
-            // If control flow reaches here, ptr *must* not be null
-            VALUE_STACK.push(ptr);
+
+            if (result == null) {
+                // That means all pointer depths are dereferenced, and that
+                // the inner-most type cannot access the specified attribute
+                throw new UndefinedOperationException("Type " + coreType + " does not allow accessing attribute " + attr);
+            }
         }
 
         final Register temporary = Register.makeTemporary();
 
         LOGGER.info(base + "." + attr + " yields " + result);
         final Statement stmt;
-        block: {
-            if (base instanceof EnumType) {
-                final EnumType enumBase = (EnumType) base;
-                final String[] keys = enumBase.getKeys();
-                for (int ordinal = 0; ordinal < keys.length; ++ordinal) {
-                    if (attr.equals(keys[ordinal])) {
-                        stmt = new Statement(Operation.LOAD_NUMERAL, new Fixnum(ordinal, Integer.SIZE), temporary);
-                        break block;
-                    }
-                }
+        if (base instanceof EnumType) {
+            final EnumType enumBase = (EnumType) base;
+            final int ordinal = enumBase.getOrdinalFor(attr);
+            if (ordinal < 0) {
                 throw new AssertionError("Unkown enum key of " + attr + " in type " + enumBase);
             }
+            stmt = new Statement(Operation.LOAD_NUMERAL, new Fixnum(ordinal, Integer.SIZE), temporary);
+        } else {
             stmt = new Statement(
-                    isPointer ? Operation.DEREF_GET_ATTR : Operation.GET_ATTR,
+                    (coreType != base) ? Operation.DEREF_GET_ATTR : Operation.GET_ATTR,
                     VALUE_STACK.pop(),
                     new Fixnum(((StructType) coreType).getOffsetOfField(attr)),
                     temporary);
