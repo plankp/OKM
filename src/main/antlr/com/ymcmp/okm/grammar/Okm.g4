@@ -101,6 +101,7 @@ stmts:
     | loopStmt
     | breakStmt
     | contStmt
+    | callMethodStmt
     | fcallStmt
     | rcallStmt
     | block;
@@ -170,6 +171,8 @@ rArgsList: (expr COMMA)* expr;
 rcallTail: LPAREN exprs = rArgsList? RPAREN;
 rcallStmt: base = expr tail = rcallTail;
 
+callMethodStmt: base = expr DOT site = fcallStmt;
+
 lambda:
     ret = type LPAREN params = paramList? RPAREN body = functionBody;
 
@@ -181,6 +184,7 @@ expr:
     | base = expr tail = rcallTail                     # exprRefCall
     | fcallStmt                                        # exprFuncCall
     | symbolName                                       # exprSymbol
+    | base = expr DOT site = fcallStmt                 # exprInvokeMethod
     | base = expr DOT attr = IDENT                     # exprAccess
     | dest = expr SET value = expr                     # exprAssign
     | op = (ADD | SUB | TILDA | AMP) rhs = expr        # exprUnary

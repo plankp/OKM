@@ -13,6 +13,7 @@ import java.util.LinkedList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 
+import java.util.stream.Stream;
 import java.util.stream.Collectors;
 
 import java.util.logging.Logger;
@@ -476,7 +477,7 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
 
     @Override
     public Type visitLambda(LambdaContext ctx) {
-        final Tuple<String, Type> pair = makeFunction(Visibility.PRIVATE, lambdaId++ + "_LAMBDA", ctx.ret, ctx.params, ctx.body);
+        final Tuple<String, FuncType> pair = makeFunction(Visibility.PRIVATE, lambdaId++ + "_LAMBDA", ctx.ret, ctx.params, ctx.body);
         final Register tmp = Register.makeTemporary();
         final Statement stmt = new Statement(Operation.LOAD_FUNC, Register.makeNamed(currentScope.getProcessedName(NAMING_STRAT, pair.getA())), tmp);
         funcStmts.add(stmt);
@@ -484,16 +485,12 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
         return pair.getB();
     }
 
-    private Tuple<String, Type> makeFunction(Visibility vis, final String base, TypeContext retCtx, ParamListContext paramsCtx, FunctionBodyContext bodyCtx) {
+    private Tuple<String, FuncType> makeFunction(Visibility vis, final String base, TypeContext retCtx, ParamListContext paramsCtx, FunctionBodyContext bodyCtx) {
         return makeMethod(vis, base, retCtx, paramsCtx, bodyCtx, new Tuple<>());
     }
 
-    private Tuple<String, Type> makeMethod(Visibility vis, final String base, TypeContext retCtx, ParamListContext paramsCtx, FunctionBodyContext bodyCtx, Tuple<String, Pointer<ClassType>> self) {
+    private Tuple<String, FuncType> makeMethod(Visibility vis, final String base, TypeContext retCtx, ParamListContext paramsCtx, FunctionBodyContext bodyCtx, Tuple<String, Pointer<ClassType>> self) {
         final List<Tuple<String, ? extends Type>> params = paramsCtx == null ? new ArrayList<>() : visitParamList(paramsCtx);
-        if (!self.isEmpty()) {
-            // There is an additional `this` pointer as first parameter
-            params.add(0, self);
-        }
 
         Type ret = visitType(retCtx);
         if (ret instanceof AllocTable) {
@@ -501,6 +498,13 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
         }
 
         final String name = Module.makeFuncName(base, params.stream().map(Tuple::getA).toArray(String[]::new));
+
+        if (!self.isEmpty()) {
+            // `this` pointer as first parameter
+            // add it after String name = ...
+            // because it is not part of the mangled name!
+            params.add(0, self);
+        }
         final Type[] paramType = params.stream().map(Tuple::getB).toArray(Type[]::new);
         LOGGER.info("Declare " + vis + " function " + name);
         final FuncType deducedType = new FuncType(ret, paramType);
@@ -607,7 +611,7 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
         final Module.Entry entry = Module.Entry.newType(currentVisibility, type, currentFile);
         currentModule.put(name, entry);
 
-        final long uniqueId = lambdaId++;
+        final ArrayList<String> methodGlobalNames = new ArrayList<>();
         for (final MethodDeclContext method : ctx.fields) {
             if (method.empty != null) {
                 // Ignore semicolons which are like non-strict separators
@@ -616,11 +620,34 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
 
             // Methods are functions with `this` pointer as additional first parameter
             final String methodName = method.base.getText();
-            final Tuple<String, Type> pair = makeMethod(Visibility.PRIVATE,
-                    uniqueId + "_METHOD_" + name + "_" + methodName,
+            final Tuple<String, FuncType> pair = makeMethod(Visibility.PRIVATE,
+                    type.mangleMethodName(methodName),
                     method.ret, method.params, method.body,
                     new Tuple<>(method.selfPtr.getText(), new Pointer<>(type.allocate())));
+            LOGGER.info("Declare method " + methodName + " under class " + name);
+
+            final String mangledName = pair.getA();
+            type.addMethod(pair.getA(), pair.getB());
+            methodGlobalNames.add(mangledName);
         }
+
+        // Add VTABLE information into module
+        final AllocTable vtable = type.getVtable();
+        final String vtableName = type.mangleVtableName();
+
+        final Module.Entry vtableEntry = Module.Entry.newVariable(Visibility.PRIVATE, vtable, currentFile);
+        currentModule.put(vtableName, vtableEntry);
+
+        // Have the initializer fill in this information at runtime
+        final Register vtableSlot = Register.makeNamed(NAMING_STRAT.name(vtableEntry, vtableName));
+        for (int i = 0; i < methodGlobalNames.size(); ++i) {
+            final String glbName = methodGlobalNames.get(i);
+            final Register flabel = Register.makeNamed(NAMING_STRAT.name(currentModule.get(glbName), glbName));
+            final Statement fillVtable = new Statement(Operation.ALLOC_GLOBAL, flabel, new Fixnum(i * 64), vtableSlot);
+            fillVtable.setDataSize(64);
+            PRE_INIT_STMTS.add(fillVtable);
+        }
+
         return null;
     }
 
@@ -763,6 +790,12 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
             throw new UndefinedOperationException("Cannot use continue outside of loop context");
         }
         funcStmts.add(new Statement(Operation.GOTO, currentLoopHead));
+        return null;
+    }
+
+    @Override
+    public Object visitCallMethodStmt(CallMethodStmtContext ctx) {
+        processInvokeMethod(ctx.base, ctx.site);
         return null;
     }
 
@@ -1380,6 +1413,65 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
         return source;
     }
 
+    private Type processInvokeMethod(final ExprContext obj, final FcallStmtContext sel) {
+        // FIXME: when parameter list is empty, this method is called
+        // when it is a struct with a function pointer:
+        //
+        //   struct HasFunc(fptr :unit(unit))
+        //   ptr := new HasFunc(fptr :func)
+        //   ptr.fptr()
+        final Type t = (Type) visit(obj);
+        final Value objValue = VALUE_STACK.pop();
+
+        // Function pointer must go before its arguments
+        // (similar problem as visitFcallStmt)
+        final Mutable callsite = new MutableCell();
+        VALUE_STACK.push(callsite);
+
+        // First parameter is the pointer to the object
+        final Register ptrToObj = Register.makeTemporary();
+        final Statement ldObjPtr = new Statement(Operation.REFER_VAR, objValue, ptrToObj);
+        funcStmts.add(ldObjPtr);
+        VALUE_STACK.push(ptrToObj);
+
+        // TODO: Just like visitExprAccess, need to unwrap the pointer:
+        //   ptr_to_class :&&FooContainer
+        //   ptr_to_class.invokeMethod(bar: 10)
+        if (t instanceof ClassType) {
+            final ClassType base = (ClassType) t;
+            final List<Tuple<String, Type>> args = sel.exprs == null ? Collections.EMPTY_LIST : visitFArgsList(sel.exprs);
+            final String methodName = Module.makeFuncName(base.mangleMethodName(sel.base.getText()), args.stream().map(Tuple::getA).toArray(String[]::new));
+            final FuncType methodType = base.tryAccessMethod(methodName);
+
+            if (methodType == null) {
+                throw new UndefinedOperationException("Type " + base + " does not have virtual method " +
+                        Module.makeFuncName(sel.base.getText(), args.stream().map(Tuple::getA).toArray(String[]::new)));
+            }
+
+            final Register vtableAddress = Register.makeTemporary();
+            final Statement ldVtablePtr = new Statement(Operation.GET_ATTR, objValue, new Fixnum(base.getVtableOffset()), vtableAddress);
+            ldVtablePtr.setDataSize(64);    // pointers are 64 bits
+            funcStmts.add(ldVtablePtr);
+
+            final Register methodAddress = Register.makeTemporary();
+            final Statement ldMethodPtr = new Statement(Operation.DEREF_GET_ATTR, vtableAddress, new Fixnum(base.getMethodOffsetInVtable(methodName)), methodAddress);
+            ldMethodPtr.setDataSize(64);    // pointers are 64 bits
+            funcStmts.add(ldMethodPtr);
+
+            // Bind the callsite
+            callsite.setValue(methodAddress);
+
+            // perform call to callsite with first parameter as pointer to the class object (`this` pointer)
+            return performCall(methodType, Stream.concat(Stream.of(new Pointer<>(base)), args.stream().map(Tuple::getB)).toArray(Type[]::new));
+        }
+        throw new UndefinedOperationException("Type " + t + " does not contain virtual methods");
+    }
+
+    @Override
+    public Type visitExprInvokeMethod(ExprInvokeMethodContext ctx) {
+        return processInvokeMethod(ctx.base, ctx.site);
+    }
+
     @Override
     public Type visitExprAccess(ExprAccessContext ctx) {
         final String attr = ctx.attr.getText();
@@ -1609,7 +1701,7 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
         if (ent.isType && ent.type instanceof AllocTable) {
             final AllocTable newData = ((AllocTable) ent.type).allocate();
             final Register temp = Register.makeTemporary();
-            final Statement stmt = new Statement(Operation.ALLOC_STRUCT, temp);
+            final Statement stmt = new Statement(Operation.ALLOC_LOCAL, temp);
             stmt.setDataSize(newData.getSize());
             funcStmts.add(stmt);
 
@@ -1632,6 +1724,24 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
                     mov.setDataSize(valueType.getSize());
                     funcStmts.add(mov);
                 }
+            }
+
+            if (newData instanceof ClassType) {
+                final ClassType objType = (ClassType) newData;
+
+                final String vtableName = currentScope.getProcessedName(NAMING_STRAT, objType.mangleVtableName());
+                if (vtableName == null) {
+                    throw new AssertionError("Expected " + objType + " to have vtable allocated!");
+                }
+
+                final Register vtableAddress = Register.makeTemporary();
+                final Statement movAddress = new Statement(Operation.REFER_VAR, Register.makeNamed(vtableName), vtableAddress);
+                movAddress.setDataSize(64);     // pointers are 64 bits
+                funcStmts.add(movAddress);
+
+                final Statement movVtable = new Statement(Operation.PUT_ATTR, temp, new Fixnum(objType.getVtableOffset()), vtableAddress);
+                movVtable.setDataSize(64);      // pointers are 64 bits
+                funcStmts.add(movVtable);
             }
 
             VALUE_STACK.push(temp);
