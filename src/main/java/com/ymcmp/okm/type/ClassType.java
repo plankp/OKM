@@ -103,14 +103,8 @@ public final class ClassType extends AllocTable {
         return allocated ? vtable.get(name) : null;
     }
 
-    @Override
-    public int getOffsetOfField(String attr) {
-        // vtable is a pointer
-        return 64 + super.getOffsetOfField(attr);
-    }
-
     public int getVtableOffset() {
-        return 0;
+        return super.getSize();
     }
 
     public int getMethodOffsetInVtable(final String name) {
