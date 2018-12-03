@@ -620,14 +620,16 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
 
             // Methods are functions with `this` pointer as additional first parameter
             final String methodName = method.base.getText();
+            final String preMangled = type.mangleMethodName(methodName);
             final Tuple<String, FuncType> pair = makeMethod(Visibility.PRIVATE,
-                    type.mangleMethodName(methodName),
+                    preMangled,
                     method.ret, method.params, method.body,
                     new Tuple<>(method.selfPtr.getText(), new Pointer<>(type.allocate())));
             LOGGER.info("Declare method " + methodName + " under class " + name);
 
             final String mangledName = pair.getA();
-            type.addMethod(pair.getA(), pair.getB());
+            final String selector = methodName + mangledName.substring(preMangled.length());
+            type.addMethod(selector, pair.getB());
             methodGlobalNames.add(mangledName);
         }
 
@@ -1451,12 +1453,11 @@ public class LocalVisitor extends OkmBaseVisitor<Object> {
         if (t instanceof ClassType) {
             final ClassType base = (ClassType) t;
             final List<Tuple<String, Type>> args = sel.exprs == null ? Collections.EMPTY_LIST : visitFArgsList(sel.exprs);
-            final String methodName = Module.makeFuncName(base.mangleMethodName(sel.base.getText()), args.stream().map(Tuple::getA).toArray(String[]::new));
+            final String methodName = Module.makeFuncName(sel.base.getText(), args.stream().map(Tuple::getA).toArray(String[]::new));
             final FuncType methodType = base.tryAccessMethod(methodName);
 
             if (methodType == null) {
-                throw new UndefinedOperationException("Type " + base + " does not have virtual method " +
-                        Module.makeFuncName(sel.base.getText(), args.stream().map(Tuple::getA).toArray(String[]::new)));
+                throw new UndefinedOperationException("Type " + base + " does not have virtual method " + methodName);
             }
 
             final Register vtableAddress = Register.makeTemporary();
