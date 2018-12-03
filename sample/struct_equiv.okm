@@ -1,0 +1,16 @@
+import std.io
+
+struct A(a, b :int)
+struct B(a, b :int)
+
+unit utilize(data :struct(a, b :int)) {
+    println(i: data.a)
+    println(i: data.b)
+}
+
+unit struct_equiv() {
+    # Function call is allowed since the two structs
+    # are structurally equivalent
+    utilize(data: new A(a: 13, b: 27))
+    utilize(data: new B(a: 10, b: 12))
+}

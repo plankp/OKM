@@ -1,0 +1,13 @@
+import std.io
+
+unit pick_max(a, b :int, block :unit(int)) =
+    block(if a > b a else b)
+
+unit lambda() {
+    # This is *not* a closure! meaning it cannot access
+    # local variables
+
+    pick_max(a :1, b: 2, block: unit(k :int) {
+        println(i: k)
+    })
+}
